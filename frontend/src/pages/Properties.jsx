@@ -1,7 +1,7 @@
 import React, { useEffect, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { getProperties, deleteProperty, getLocations } from '../api';
-import { Search, Edit2, Trash2, Plus, Filter, Share2, Download, FileText, Printer, FileSpreadsheet } from 'lucide-react';
+import { Search, Edit2, Trash2, Plus, Filter, Share2, Download, Printer, FileSpreadsheet } from 'lucide-react';
 import { PhotoGrid } from '../components/Gallery';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';

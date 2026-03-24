@@ -41,12 +41,13 @@ const Grid = ({ children }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>{children}</div>
 );
 
+const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '', extent_value: '', extent_unit: 'Acres', file_attachments: [] };
+
 export default function PropertyForm({ mode = 'add' }) {
   const navigate = useNavigate();
   const { id } = useParams();
   const fileInputRef = useRef();
 
-  const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '', extent_value: '', extent_unit: 'Acres', file_attachments: [] };
   const [form, setForm] = useState(empty);
   const [loading, setLoading] = useState(false);
   const [fetching, setFetching] = useState(mode === 'edit');

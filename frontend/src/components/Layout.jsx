@@ -1,11 +1,9 @@
 import React, { useState } from 'react';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { LayoutDashboard, Building2, PlusCircle, Menu, X } from 'lucide-react';
-import toast from 'react-hot-toast';
 
 export default function Layout({ children }) {
   const location = useLocation();
-  const navigate = useNavigate();
   const [mobileOpen, setMobileOpen] = useState(false);
 
 
