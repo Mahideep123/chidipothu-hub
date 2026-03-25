@@ -16,9 +16,18 @@ load_dotenv()
 
 app = FastAPI(title="Chidipothu Hub API")
 
+origins = [
+    "http://localhost:3000",
+    "http://localhost:3001",
+    "https://chidipothu-hub-zfpr.vercel.app",
+    "https://chidipothu-hub.vercel.app"
+]
+if os.getenv("FRONTEND_URL"):
+    origins.append(os.getenv("FRONTEND_URL"))
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

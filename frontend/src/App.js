@@ -8,7 +8,7 @@ import PropertyForm from './pages/PropertyForm';
 import Login from './pages/Login';
 
 const PrivateRoute = ({ children }) => {
-  const token = localStorage.getItem('token');
+  const token = sessionStorage.getItem('token');
   return token ? children : <Navigate to="/login" replace />;
 };
 

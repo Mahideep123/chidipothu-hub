@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Building2, PlusCircle, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Building2, PlusCircle, Menu, X, LogOut } from 'lucide-react';
 
 export default function Layout({ children }) {
   const location = useLocation();
@@ -59,6 +59,21 @@ export default function Layout({ children }) {
         })}
       </nav>
 
+      <div style={{ marginTop: 'auto', paddingTop: '20px', borderTop: '1px solid rgba(148,163,184,0.1)' }}>
+        <button onClick={() => {
+          sessionStorage.removeItem('token');
+          sessionStorage.removeItem('user');
+          window.location.href = '/login';
+        }} style={{
+          display: 'flex', alignItems: 'center', gap: '12px', width: '100%',
+          padding: '12px 14px', borderRadius: '10px',
+          background: 'none', border: 'none', color: '#ef4444',
+          cursor: 'pointer', transition: 'all 0.2s', textAlign: 'left'
+        }}>
+          <LogOut size={18} />
+          <span style={{ fontSize: '14px', fontWeight: 600 }}>Logout</span>
+        </button>
+      </div>
     </aside>
   );
 

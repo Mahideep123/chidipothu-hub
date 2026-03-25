@@ -15,8 +15,8 @@ const Login = () => {
     setLoading(true);
     try {
       const { data } = await passwordLogin(password);
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', data.user);
+      sessionStorage.setItem('token', data.token);
+      sessionStorage.setItem('user', data.user);
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err) {
