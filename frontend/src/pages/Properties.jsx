@@ -67,15 +67,20 @@ export default function Properties() {
       `Door No: ${p.door_no || 'N/A'}\n` +
       `Document Number: ${p.document_number || 'N/A'}\n` +
       `Survey Number: ${p.survey_number || 'N/A'}\n` +
+      `LPM Number: ${p.lpm_number || 'N/A'}\n` +
       `Patta Number: ${p.patta_number || 'N/A'}\n` +
       `Khata Number: ${p.khata_number || 'N/A'}\n` +
+      `Assessment / Property Tax No.: ${p.assessment_number || 'N/A'}\n` +
+      `Mother Document Number: ${p.mother_document || 'N/A'}\n` +
+      `Document Location: ${p.document_location || 'N/A'}\n` +
       `Extent: ${p.extent_value ? `${p.extent_value} ${p.extent_unit}` : 'N/A'}\n` +
+      (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
       `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
 
     if (p.remarks) text += `\nRemarks: ${p.remarks}`;
 
     if (p.file_attachments && p.file_attachments.length > 0) {
-      text += `\n\n*Attachments:*\n` + p.file_attachments.map((f, i) => `${i+1}. ${f.name}`).join('\n');
+      text += `\n\n*Attachments:* ${p.file_attachments.length} file(s) available`;
     }
     const filesArray = [];
 
@@ -86,8 +91,6 @@ export default function Properties() {
 
     const getCloudinaryDownloadUrl = (f) => {
       if (!f.url || !f.url.includes('cloudinary.com')) return f.url;
-      // Inject fl_attachment into the URL for direct browser download
-      // Typical URL: .../upload/v12345/public_id.ext
       if (f.url.includes('/upload/')) {
         return f.url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`);
       }
@@ -115,7 +118,6 @@ export default function Properties() {
             }
           }
 
-          console.log(`[Share] Fetching: ${downloadUrl}`);
           try {
             const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
             if (!res.ok) throw new Error(`Status ${res.status}`);
@@ -123,11 +125,8 @@ export default function Properties() {
             const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
             filesArray.push(new File([blob], cleanName, { type: f.type === 'image' ? 'image/jpeg' : 'application/pdf' }));
           } catch (fetchErr) {
-            console.warn(`[Share] Proxy fetch failed for ${f.name}, trying direct...`, fetchErr);
-            // Fallback: try direct fetch if proxy fails (might work if CORS is set on Cloudinary)
             const directUrl = getCloudinaryDownloadUrl(f);
-            const res = await fetch(directUrl, { mode: 'no-cors' }); // no-cors lets us fetch but not read blob
-            // Wait, no-cors with blob is useless. We really need the proxy or CORS-enabled direct.
+            await fetch(directUrl, { mode: 'no-cors' });
             toast.error(`Could not fetch ${f.name} for sharing`, { id: toastId });
           }
           await new Promise(r => setTimeout(r, 200));
@@ -147,7 +146,6 @@ export default function Properties() {
           await navigator.share({ title: 'Property Details', text });
         }
       } catch(err) { 
-        console.error('Share error', err); 
         if (err.name !== 'AbortError') toast.error('Sharing failed: ' + err.message);
       }
     } else {
@@ -159,7 +157,6 @@ export default function Properties() {
   const handleDownloadDocs = async (p) => {
     toast.loading('Starting downloads...');
     
-    // 1. Download Property Details as a TXT file
     let pName = p.property_name || 'Unnamed Property';
     let text = `*Property details*\n` +
       `Property Name: ${pName}\n` +
@@ -169,9 +166,14 @@ export default function Properties() {
       `Door No: ${p.door_no || 'N/A'}\n` +
       `Document Number: ${p.document_number || 'N/A'}\n` +
       `Survey Number: ${p.survey_number || 'N/A'}\n` +
+      `LPM Number: ${p.lpm_number || 'N/A'}\n` +
       `Patta Number: ${p.patta_number || 'N/A'}\n` +
       `Khata Number: ${p.khata_number || 'N/A'}\n` +
+      `Assessment / Property Tax No.: ${p.assessment_number || 'N/A'}\n` +
+      `Mother Document Number: ${p.mother_document || 'N/A'}\n` +
+      `Document Location: ${p.document_location || 'N/A'}\n` +
       `Extent: ${p.extent_value ? `${p.extent_value} ${p.extent_unit}` : 'N/A'}\n` +
+      (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
       `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
 
     if (p.remarks) text += `\nRemarks: ${p.remarks}`;
@@ -186,7 +188,6 @@ export default function Properties() {
     document.body.removeChild(txtLink);
     URL.revokeObjectURL(txtUrl);
 
-    // 2. Download all file attachments
     let baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
     if (baseUrl.includes('localhost') && window.location.hostname !== 'localhost') {
       baseUrl = baseUrl.replace('localhost', window.location.hostname);
@@ -206,7 +207,6 @@ export default function Properties() {
              downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
           }
 
-          console.log(`[Download] Fetching Blob: ${downloadUrl}`);
           const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
           if (!res.ok) throw new Error(`Status ${res.status}`);
           const blob = await res.blob();
@@ -220,11 +220,8 @@ export default function Properties() {
           document.body.removeChild(link);
           window.URL.revokeObjectURL(blobUrl);
 
-          // Delay to prevent browser blocking multiple downloads
           await new Promise(r => setTimeout(r, 600));
         } catch (err) {
-          console.error('[Download] Failed for', f.name, err);
-          // Failsafe: try direct link if blob fails
           const link = document.createElement('a');
           link.href = f.url;
           link.target = '_blank';
@@ -272,8 +269,17 @@ export default function Properties() {
       'Khata No.': p.khata_number || '-',
       'Document No.': p.document_number || '-',
       'Survey No.': p.survey_number || '-',
+      'LPM No.': p.lpm_number || '-',
+      'Patta No.': p.patta_number || '-',
+      'Assessment No.': p.assessment_number || '-',
+      'Mother Document No.': p.mother_document || '-',
+      'Document Location': p.document_location || '-',
+      'Land As Per 1B': p.land_as_per_1b || '-',
       'Extent': p.extent_value ? `${p.extent_value} ${p.extent_unit}` : '-',
-      'Location': [p.village, p.mandal, p.district, p.state].filter(Boolean).join(' - ') || '-',
+      'Village': p.village || '-',
+      'Mandal': p.mandal || '-',
+      'District': p.district || '-',
+      'State': p.state || '-',
       'Remarks': p.remarks || '-'
     }));
 
@@ -283,7 +289,9 @@ export default function Properties() {
     
     const colWidths = [
       {wch: 25}, {wch: 15}, {wch: 25}, {wch: 20}, {wch: 15}, 
-      {wch: 20}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 40}, {wch: 30}
+      {wch: 20}, {wch: 25}, {wch: 20}, {wch: 15}, {wch: 15}, 
+      {wch: 20}, {wch: 25}, {wch: 25}, {wch: 20}, {wch: 15},
+      {wch: 20}, {wch: 20}, {wch: 20}, {wch: 20}, {wch: 30}
     ];
     worksheet['!cols'] = colWidths;
 
@@ -312,41 +320,41 @@ export default function Properties() {
              <h2>Selected Properties</h2>
              <button onclick="window.print()" style="padding:8px 16px; cursor:pointer;">Print Now</button>
           </div>
-          <table>
-            <thead>
-              <tr>
-                <th>Property Name</th>
-                <th>Type</th>
-                <th>Owner</th>
-                <th>Plot/Flat No.</th>
-                <th>Location</th>
-                <th>Extent</th>
-              </tr>
-            </thead>
-            <tbody>
-              ${selectedProps.map(p => `
-                <tr>
-                  <td>${p.property_name || '-'}</td>
-                  <td>${p.property_type || '-'}</td>
-                  <td>${p.owner_name || '-'}</td>
-                  <td>${p.plot_no || '-'}</td>
-                  <td>${[p.village, p.mandal, p.district].filter(Boolean).join(', ') || '-'}</td>
-                  <td>${p.extent_value ? p.extent_value + ' ' + p.extent_unit : '-'}</td>
-                </tr>
-              `).join('')}
-            </tbody>
-          </table>
+          <div id="print-content">
+            \${selectedProps.map(p => \`
+              <div style="margin-bottom: 30px; border: 1px solid #000; padding: 20px; page-break-inside: avoid;">
+                <h3 style="margin: 0 0 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">
+                  \${p.property_name || 'Unnamed Property'} - \${p.property_type || 'N/A'}
+                </h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; font-size: 13px;">
+                  <div><strong>Owner:</strong> \${p.owner_name || '-'}</div>
+                  <div><strong>Door No:</strong> \${p.door_no || '-'}</div>
+                  <div><strong>Plot/Flat No:</strong> \${p.plot_no || '-'}</div>
+                  <div><strong>Khata No:</strong> \${p.khata_number || '-'}</div>
+                  <div><strong>Reg. No:</strong> \${p.document_number || '-'}</div>
+                  <div><strong>Survey No:</strong> \${p.survey_number || '-'}</div>
+                  <div><strong>LPM No:</strong> \${p.lpm_number || '-'}</div>
+                  <div><strong>Patta No:</strong> \${p.patta_number || '-'}</div>
+                  <div><strong>Tax No:</strong> \${p.assessment_number || '-'}</div>
+                  <div><strong>Mother Doc:</strong> \${p.mother_document || '-'}</div>
+                  <div><strong>Doc Location:</strong> \${p.document_location || '-'}</div>
+                  <div><strong>Land (1B):</strong> \${p.land_as_per_1b || '-'}</div>
+                  <div><strong>Extent:</strong> \${p.extent_value ? \`\${p.extent_value} \${p.extent_unit}\` : '-'}</div>
+                  <div><strong>Location:</strong> \${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '-'}</div>
+                  <div style="grid-column: span 2;"><strong>Remarks:</strong> \${p.remarks || '-'}</div>
+                </div>
+              </div>
+            \`).join('')}
+          </div>
           <script>
             window.onload = () => { window.print(); }
           </script>
         </body>
       </html>
-    `);
+    \`);
     printWindow.document.close();
   };
 
-
-  /* ── badge ── */
   const Badge = ({ type }) => {
     const cfg = TYPE_BADGE[type] || { bg: '#f1f5f9', color: '#475569' };
     return (
@@ -358,7 +366,6 @@ export default function Properties() {
     );
   };
 
-  /* ── select style ── */
   const selStyle = {
     padding: '9px 14px', borderRadius: '8px', border: '1px solid #e2e8f0',
     fontSize: '14px', background: '#fff', cursor: 'pointer', color: '#374151',
@@ -368,7 +375,7 @@ export default function Properties() {
   return (
     <div style={{ fontFamily: "'Inter',sans-serif" }}>
 
-      {/* ── Header ── */}
+      {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '24px', flexWrap: 'wrap', gap: '12px' }}>
         <div>
           <h1 style={{ fontFamily: "'Manrope',sans-serif", fontSize: '28px', fontWeight: 700, color: '#1e293b', margin: '0 0 4px' }}>Properties</h1>
@@ -383,11 +390,9 @@ export default function Properties() {
         </button>
       </div>
 
-      {/* ── Filter card ── */}
+      {/* Filter card */}
       <div style={{ background: '#fff', borderRadius: '12px', padding: '20px', marginBottom: '20px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
-        {/* Row 1: search + dropdowns */}
         <div style={{ display: 'flex', gap: '10px', flexWrap: 'wrap', alignItems: 'center', marginBottom: '12px' }}>
-          {/* Search */}
           <div style={{ flex: '1 1 200px', position: 'relative', minWidth: '180px' }}>
             <Search size={15} style={{ position: 'absolute', left: '12px', top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} />
             <input
@@ -404,32 +409,28 @@ export default function Properties() {
             />
           </div>
 
-          {/* State dropdown */}
           <select value={filterState} onChange={e => setFilterState(e.target.value)} style={selStyle}>
             <option value="">All States</option>
             {states.map(s => <option key={s} value={s}>{s}</option>)}
           </select>
 
-          {/* Village dropdown */}
           <select value={filterVillage} onChange={e => setFilterVillage(e.target.value)} style={selStyle}>
             <option value="">All Villages</option>
             {villages.map(v => <option key={v} value={v}>{v}</option>)}
           </select>
 
-          {/* Type dropdown */}
           <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selStyle}>
             {TYPES.map(t => <option key={t} value={t === 'All Types' ? '' : t}>{t}</option>)}
           </select>
         </div>
 
-        {/* Row 2: result count */}
         <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#64748b', fontSize: '13px' }}>
           <Filter size={13} />
           <span>Showing {props.length} of {props.length} properties</span>
         </div>
       </div>
 
-      {/* ── View toggle ── */}
+      {/* View toggle */}
       <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
         {['table', 'card'].map(v => (
           <button key={v} onClick={() => setView(v)} style={{
@@ -445,7 +446,7 @@ export default function Properties() {
         ))}
       </div>
 
-      {/* ── Batch Actions ── */}
+      {/* Batch Actions */}
       {selectedIds.size > 0 && (
         <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', padding: '12px 16px', background: '#e0e7ff', borderRadius: '8px', alignItems: 'center' }}>
           <span style={{ fontSize: '14px', fontWeight: 600, color: '#3730a3', marginRight: 'auto' }}>{selectedIds.size} property(s) selected</span>
@@ -458,14 +459,14 @@ export default function Properties() {
         </div>
       )}
 
-      {/* ── Loading ── */}
+      {/* Loading */}
       {loading && (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '60px', textAlign: 'center', color: '#94a3b8', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
           Loading properties...
         </div>
       )}
 
-      {/* ── Empty ── */}
+      {/* Empty */}
       {!loading && props.length === 0 && (
         <div style={{ background: '#fff', borderRadius: '12px', padding: '60px', textAlign: 'center', color: '#94a3b8', boxShadow: '0 1px 4px rgba(0,0,0,0.07)' }}>
           <Plus size={32} style={{ marginBottom: '10px', opacity: 0.3 }} />
@@ -473,7 +474,7 @@ export default function Properties() {
         </div>
       )}
 
-      {/* ══════════════ TABLE VIEW ══════════════ */}
+      {/* TABLE VIEW */}
       {!loading && view === 'table' && props.length > 0 && (
         <div style={{ background: '#fff', borderRadius: '12px', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflowX: 'auto' }}>
           <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: '900px' }}>
@@ -482,7 +483,7 @@ export default function Properties() {
                 <th style={{ padding: '14px 16px', width: '40px' }}>
                   <input type="checkbox" checked={props.length > 0 && selectedIds.size === props.length} onChange={handleSelectAll} style={{ cursor: 'pointer', transform: 'scale(1.1)' }} title="Select All" />
                 </th>
-                {['PROPERTY TYPE', 'PROPERTY NAME', 'DOOR NO.', 'OWNER NAME', 'PLOT NO. / FLAT NO.', 'KHATA NUMBER', 'LOCATION', 'EXTENT', 'REGISTRATION NO.', 'DOCUMENTS', 'ACTIONS'].map(h => (
+                {['TYPE', 'PROPERTY NAME', 'DOOR NO.', 'OWNER', 'PLOT/FLAT NO.', 'KHATA NO.', 'SURVEY NO.', 'LPM NO.', 'PATTA NO.', 'TAX NO.', 'MOTHER DOC', 'DOC LOCATION', 'LAND (1B)', 'LOCATION', 'EXTENT', 'REG. NO.', 'REMARKS', 'DOCS', 'ACTIONS'].map(h => (
                   <th key={h} style={{
                     padding: '14px 16px', textAlign: 'left',
                     fontSize: '11px', fontWeight: 700, color: '#64748b',
@@ -507,6 +508,13 @@ export default function Properties() {
                   <td style={{ padding: '14px 16px', fontSize: '14px', color: '#1e293b', fontWeight: 500 }}>{p.owner_name || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.plot_no || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.khata_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.survey_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.lpm_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.patta_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.assessment_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.mother_document || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.document_location || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.land_as_per_1b || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '180px' }}>
                     {[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '—'}
                   </td>
@@ -514,33 +522,18 @@ export default function Properties() {
                     {p.extent_value ? `${p.extent_value} ${p.extent_unit}` : '—'}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.document_number || '—'}</td>
+                  <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.remarks || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: p.file_attachments?.length ? '#3b82f6' : '#94a3b8' }}>
                     {p.file_attachments?.length ? `${p.file_attachments.length} file(s)` : 'No docs'}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
-                      <button
-                        onClick={() => handleShare(p)}
-                        style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#10b981' }}
-                        title="Share"
-                      ><Share2 size={15} /></button>
+                      <button onClick={() => handleShare(p)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#10b981' }} title="Share"><Share2 size={15} /></button>
                       {p.file_attachments?.length > 0 && (
-                        <button
-                          onClick={() => handleDownloadDocs(p)}
-                          style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1' }}
-                          title="Download All Docs"
-                        ><Download size={15} /></button>
+                        <button onClick={() => handleDownloadDocs(p)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1' }} title="Download All Docs"><Download size={15} /></button>
                       )}
-                      <button
-                        onClick={() => navigate(`/edit-property/${p.id}`)}
-                        style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6' }}
-                        title="Edit"
-                      ><Edit2 size={15} /></button>
-                      <button
-                        onClick={() => setDeleteId(p.id)}
-                        style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444' }}
-                        title="Delete"
-                      ><Trash2 size={15} /></button>
+                      <button onClick={() => navigate(`/edit-property/${p.id}`)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6' }} title="Edit"><Edit2 size={15} /></button>
+                      <button onClick={() => setDeleteId(p.id)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444' }} title="Delete"><Trash2 size={15} /></button>
                     </div>
                   </td>
                 </tr>
@@ -550,7 +543,7 @@ export default function Properties() {
         </div>
       )}
 
-      {/* ══════════════ CARD VIEW ══════════════ */}
+      {/* CARD VIEW */}
       {!loading && view === 'card' && props.length > 0 && (
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(320px, 1fr))', gap: '16px' }}>
           {props.map(p => (
@@ -560,7 +553,6 @@ export default function Properties() {
               borderLeft: '4px solid #3b82f6', overflow: 'hidden',
             }}>
               <div style={{ padding: '18px' }}>
-                {/* Top row */}
                 <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: '12px' }}>
                   <div style={{ marginRight: '14px', marginTop: '2px' }}>
                     <input type="checkbox" checked={selectedIds.has(p.id)} onChange={() => handleSelect(p.id)} style={{ cursor: 'pointer', transform: 'scale(1.2)' }} />
@@ -575,30 +567,15 @@ export default function Properties() {
                     </p>
                   </div>
                   <div style={{ display: 'flex', gap: '4px', marginLeft: '8px' }}>
-                    <button onClick={() => handleShare(p)}
-                      title="Share"
-                      style={{ padding: '6px', background: '#ecfdf5', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#10b981', display:'flex' }}>
-                      <Share2 size={14} />
-                    </button>
+                    <button onClick={() => handleShare(p)} title="Share" style={{ padding: '6px', background: '#ecfdf5', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#10b981', display:'flex' }}><Share2 size={14} /></button>
                     {p.file_attachments?.length > 0 && (
-                      <button onClick={() => handleDownloadDocs(p)}
-                        title="Download All Docs"
-                        style={{ padding: '6px', background: '#eef2ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1', display:'flex' }}>
-                        <Download size={14} />
-                      </button>
+                      <button onClick={() => handleDownloadDocs(p)} title="Download All Docs" style={{ padding: '6px', background: '#eef2ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1', display:'flex' }}><Download size={14} /></button>
                     )}
-                    <button onClick={() => navigate(`/edit-property/${p.id}`)}
-                      style={{ padding: '6px', background: '#eff6ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6', display:'flex' }}>
-                      <Edit2 size={14} />
-                    </button>
-                    <button onClick={() => setDeleteId(p.id)}
-                      style={{ padding: '6px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', display:'flex' }}>
-                      <Trash2 size={14} />
-                    </button>
+                    <button onClick={() => navigate(`/edit-property/${p.id}`)} style={{ padding: '6px', background: '#eff6ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6', display:'flex' }}><Edit2 size={14} /></button>
+                    <button onClick={() => setDeleteId(p.id)} style={{ padding: '6px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', display:'flex' }}><Trash2 size={14} /></button>
                   </div>
                 </div>
 
-                {/* Details grid */}
                 <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '8px', marginBottom: '10px' }}>
                   {[
                     ['Owner',                   p.owner_name],
@@ -606,8 +583,17 @@ export default function Properties() {
                     ['Khata No.',               p.khata_number],
                     ['Reg. No.',                p.document_number],
                     ['Extent',                  p.extent_value ? `${p.extent_value} ${p.extent_unit}` : null],
-                    ['Location',                [p.village, p.mandal, p.district].filter(Boolean).join(', ')],
+                    ['Survey No.',              p.survey_number],
+                    ['LPM No.',                 p.lpm_number],
                     ['Patta No.',               p.patta_number],
+                    ['Tax No.',                 p.assessment_number],
+                    ['Mother Doc',              p.mother_document],
+                    ['Doc Location',            p.document_location],
+                    ['Land (1B)',               p.land_as_per_1b],
+                    ['Village',                 p.village],
+                    ['Mandal',                  p.mandal],
+                    ['District',                p.district],
+                    ['State',                   p.state],
                   ].filter(([, v]) => v).map(([label, val]) => (
                     <div key={label}>
                       <span style={{ fontSize: '11px', color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '0.4px', display: 'block' }}>{label}</span>
@@ -629,7 +615,7 @@ export default function Properties() {
         </div>
       )}
 
-      {/* ── Delete confirm modal ── */}
+      {/* Delete confirm modal */}
       {deleteId && (
         <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 500, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '20px' }}>
           <div style={{ background: '#fff', borderRadius: '16px', padding: '32px', maxWidth: '360px', width: '100%', textAlign: 'center', boxShadow: '0 20px 60px rgba(0,0,0,0.2)' }}>
