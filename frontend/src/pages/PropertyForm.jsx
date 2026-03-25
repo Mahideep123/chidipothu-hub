@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { createProperty, updateProperty, getProperty, uploadFile, deleteFile } from '../api';
-import { ArrowLeft, Upload, X, FileText, ImageIcon, Loader } from 'lucide-react';
+import { ArrowLeft, Upload, X, FileText, ImageIcon, Loader, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const TYPES = ['House', 'Shop', 'Agriculture Land', 'Site', 'Commercial Godown'];

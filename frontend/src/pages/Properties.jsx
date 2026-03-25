@@ -73,7 +73,7 @@ export default function Properties() {
       `Assessment / Property Tax No.: ${p.assessment_number || 'N/A'}\n` +
       `Mother Document Number: ${p.mother_document || 'N/A'}\n` +
       `Document Location: ${p.document_location || 'N/A'}\n` +
-      `Extent: ${p.extent_value ? `${p.extent_value} ${p.extent_unit}` : 'N/A'}\n` +
+      `Extent: ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : 'N/A'}\n` +
       (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
       `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
 
@@ -218,7 +218,7 @@ export default function Properties() {
       `Assessment / Property Tax No.: ${p.assessment_number || 'N/A'}\n` +
       `Mother Document Number: ${p.mother_document || 'N/A'}\n` +
       `Document Location: ${p.document_location || 'N/A'}\n` +
-      `Extent: ${p.extent_value ? `${p.extent_value} ${p.extent_unit}` : 'N/A'}\n` +
+      `Extent: ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : 'N/A'}\n` +
       (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
       `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
 
@@ -321,7 +321,7 @@ export default function Properties() {
       'Mother Document No.': p.mother_document || '-',
       'Document Location': p.document_location || '-',
       'Land As Per 1B': p.land_as_per_1b || '-',
-      'Extent': p.extent_value ? `${p.extent_value} ${p.extent_unit}` : '-',
+      'Extent': p.extent_value ? p.extent_value + ' ' + p.extent_unit : '-',
       'Village': p.village || '-',
       'Mandal': p.mandal || '-',
       'District': p.district || '-',
@@ -367,37 +367,37 @@ export default function Properties() {
              <button onclick="window.print()" style="padding:8px 16px; cursor:pointer;">Print Now</button>
           </div>
           <div id="print-content">
-            \${selectedProps.map(p => \`
+            ${selectedProps.map(p => `
               <div style="margin-bottom: 30px; border: 1px solid #000; padding: 20px; page-break-inside: avoid;">
                 <h3 style="margin: 0 0 15px; border-bottom: 2px solid #333; padding-bottom: 5px;">
-                  \${p.property_name || 'Unnamed Property'} - \${p.property_type || 'N/A'}
+                  ${p.property_name || 'Unnamed Property'} - ${p.property_type || 'N/A'}
                 </h3>
                 <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px 15px; font-size: 13px;">
-                  <div><strong>Owner:</strong> \${p.owner_name || '-'}</div>
-                  <div><strong>Door No:</strong> \${p.door_no || '-'}</div>
-                  <div><strong>Plot/Flat No:</strong> \${p.plot_no || '-'}</div>
-                  <div><strong>Khata No:</strong> \${p.khata_number || '-'}</div>
-                  <div><strong>Reg. No:</strong> \${p.document_number || '-'}</div>
-                  <div><strong>Survey No:</strong> \${p.survey_number || '-'}</div>
-                  <div><strong>LPM No:</strong> \${p.lpm_number || '-'}</div>
-                  <div><strong>Patta No:</strong> \${p.patta_number || '-'}</div>
-                  <div><strong>Tax No:</strong> \${p.assessment_number || '-'}</div>
-                  <div><strong>Mother Doc:</strong> \${p.mother_document || '-'}</div>
-                  <div><strong>Doc Location:</strong> \${p.document_location || '-'}</div>
-                  <div><strong>Land (1B):</strong> \${p.land_as_per_1b || '-'}</div>
-                  <div><strong>Extent:</strong> \${p.extent_value ? \`\${p.extent_value} \${p.extent_unit}\` : '-'}</div>
-                  <div><strong>Location:</strong> \${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '-'}</div>
-                  <div style="grid-column: span 2;"><strong>Remarks:</strong> \${p.remarks || '-'}</div>
+                  <div><strong>Owner:</strong> ${p.owner_name || '-'}</div>
+                  <div><strong>Door No:</strong> ${p.door_no || '-'}</div>
+                  <div><strong>Plot/Flat No:</strong> ${p.plot_no || '-'}</div>
+                  <div><strong>Khata No:</strong> ${p.khata_number || '-'}</div>
+                  <div><strong>Reg. No:</strong> ${p.document_number || '-'}</div>
+                  <div><strong>Survey No:</strong> ${p.survey_number || '-'}</div>
+                  <div><strong>LPM No:</strong> ${p.lpm_number || '-'}</div>
+                  <div><strong>Patta No:</strong> ${p.patta_number || '-'}</div>
+                  <div><strong>Tax No:</strong> ${p.assessment_number || '-'}</div>
+                  <div><strong>Mother Doc:</strong> ${p.mother_document || '-'}</div>
+                  <div><strong>Doc Location:</strong> ${p.document_location || '-'}</div>
+                  <div><strong>Land (1B):</strong> ${p.land_as_per_1b || '-'}</div>
+                  <div><strong>Extent:</strong> ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : '-'}</div>
+                  <div><strong>Location:</strong> ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '-'}</div>
+                  <div style="grid-column: span 2;"><strong>Remarks:</strong> ${p.remarks || '-'}</div>
                 </div>
               </div>
-            \`).join('')}
+            `).join('')}
           </div>
           <script>
             window.onload = () => { window.print(); }
           </script>
         </body>
       </html>
-    \`);
+    `);
     printWindow.document.close();
   };
 
@@ -565,12 +565,12 @@ export default function Properties() {
                     {[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '—'}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>
-                    {p.extent_value ? `${p.extent_value} ${p.extent_unit}` : '—'}
+                    {p.extent_value ? p.extent_value + ' ' + p.extent_unit : '—'}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.document_number || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '200px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.remarks || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: p.file_attachments?.length ? '#3b82f6' : '#94a3b8' }}>
-                    {p.file_attachments?.length ? `${p.file_attachments.length} file(s)` : 'No docs'}
+                    {p.file_attachments?.length ? p.file_attachments.length + ' file(s)' : 'No docs'}
                   </td>
                   <td style={{ padding: '14px 16px' }}>
                     <div style={{ display: 'flex', gap: '6px' }}>
@@ -578,7 +578,7 @@ export default function Properties() {
                       {p.file_attachments?.length > 0 && (
                         <button onClick={() => handleDownloadDocs(p)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1' }} title="Download All Docs"><Download size={15} /></button>
                       )}
-                      <button onClick={() => navigate(`/edit-property/${p.id}`)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6' }} title="Edit"><Edit2 size={15} /></button>
+                      <button onClick={() => navigate('/edit-property/' + p.id)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6' }} title="Edit"><Edit2 size={15} /></button>
                       <button onClick={() => setDeleteId(p.id)} style={{ padding: '6px 8px', background: 'none', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444' }} title="Delete"><Trash2 size={15} /></button>
                     </div>
                   </td>
@@ -617,7 +617,7 @@ export default function Properties() {
                     {p.file_attachments?.length > 0 && (
                       <button onClick={() => handleDownloadDocs(p)} title="Download All Docs" style={{ padding: '6px', background: '#eef2ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#6366f1', display:'flex' }}><Download size={14} /></button>
                     )}
-                    <button onClick={() => navigate(`/edit-property/${p.id}`)} style={{ padding: '6px', background: '#eff6ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6', display:'flex' }}><Edit2 size={14} /></button>
+                    <button onClick={() => navigate('/edit-property/' + p.id)} style={{ padding: '6px', background: '#eff6ff', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#3b82f6', display:'flex' }}><Edit2 size={14} /></button>
                     <button onClick={() => setDeleteId(p.id)} style={{ padding: '6px', background: '#fef2f2', border: 'none', borderRadius: '6px', cursor: 'pointer', color: '#ef4444', display:'flex' }}><Trash2 size={14} /></button>
                   </div>
                 </div>
@@ -628,7 +628,7 @@ export default function Properties() {
                     ['Plot No. / Flat No.',     p.plot_no],
                     ['Khata No.',               p.khata_number],
                     ['Reg. No.',                p.document_number],
-                    ['Extent',                  p.extent_value ? `${p.extent_value} ${p.extent_unit}` : null],
+                    ['Extent',                  p.extent_value ? p.extent_value + ' ' + p.extent_unit : null],
                     ['Survey No.',              p.survey_number],
                     ['LPM No.',                 p.lpm_number],
                     ['Patta No.',               p.patta_number],
