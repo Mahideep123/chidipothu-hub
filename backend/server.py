@@ -250,9 +250,9 @@ async def delete_file(public_id: str, current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/proxy-file/{public_id:path}")
-def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None):
+def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None, disposition: str = None):
     # Log for debugging (Render logs)
-    print(f"DEBUG: Proxy request for {public_id}, type={resource_type}, name={filename}")
+    print(f"DEBUG: Proxy request for {public_id}, type={resource_type}, name={filename}, disposition={disposition}")
     
     try:
         # Check Cloudinary config
@@ -277,20 +277,26 @@ def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None)
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         response = urllib.request.urlopen(req, timeout=15)
         
+        content_type = response.headers.get("Content-Type", "application/octet-stream")
         headers = {
             "Access-Control-Allow-Origin": "*",
-            "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
+            "Content-Type": content_type
         }
+        
+        # Determine disposition: if filename is provided, default to attachment (download)
+        # If disposition is explicitly set, use that. Otherwise inline for viewing.
         if filename:
             from urllib.parse import quote
-            safe_filename = quote(filename).replace("%20", "_") # Use underscores for headers
-            headers["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
+            safe_filename = quote(filename).replace("%20", "_")
+            disp_type = disposition if disposition in ("inline", "attachment") else "attachment"
+            headers["Content-Disposition"] = f'{disp_type}; filename="{safe_filename}"'
+        else:
+            # No filename = viewing mode, use inline so PDFs render in browser
+            headers["Content-Disposition"] = "inline"
         
         return StreamingResponse(response, headers=headers)
     except Exception as e:
         print(f"Proxy critical error: {str(e)}")
-        # If it fails, maybe it's a CORS issue on the fetch itself. 
-        # Return a meaningful error to the frontend if possible
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/files/{file_id}")

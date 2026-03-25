@@ -121,6 +121,61 @@ export function PhotoGrid({ files = [], maxShow = 4 }) {
   if (!files.length) return null;
 
   const baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+  const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost')
+    ? baseUrl.replace('http://', 'https://')
+    : baseUrl;
+
+  // Get direct Cloudinary URL for viewing (no attachment flag — opens inline)
+  const getViewUrl = (doc) => {
+    return doc.url || '#';
+  };
+
+  // Get proxy URL for reliable download
+  const getProxyDownloadUrl = (doc) => {
+    const encodedId = encodeURIComponent(doc.public_id || '');
+    const encodedName = encodeURIComponent(doc.name || 'document');
+    if (doc.public_id && doc.public_id.includes('/')) {
+      return `${secureBase}/api/proxy-file/${encodedId}?resource_type=raw&filename=${encodedName}`;
+    }
+    return doc.url;
+  };
+
+  // Programmatic download via blob fetch (bypasses cross-origin download attribute issue)
+  const handleDocDownload = async (e, doc) => {
+    e.preventDefault();
+    e.stopPropagation();
+    const downloadUrl = getProxyDownloadUrl(doc);
+    try {
+      const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+      if (!res.ok) throw new Error(`Status ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = blobUrl;
+      link.download = doc.name || 'document';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(blobUrl);
+    } catch (err) {
+      // Fallback: open direct Cloudinary URL with attachment flag
+      let fallbackUrl = doc.url;
+      if (doc.url && doc.url.includes('cloudinary.com')) {
+        const encodedName = encodeURIComponent(doc.name || 'document');
+        fallbackUrl = doc.url.includes('/upload/')
+          ? doc.url.replace('/upload/', `/upload/fl_attachment:${encodedName}/`)
+          : doc.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodedName}/`);
+      }
+      window.open(fallbackUrl, '_blank');
+    }
+  };
+
+  // Open file for viewing (PDFs open inline in browser)
+  const handleDocOpen = (e, doc) => {
+    e.preventDefault();
+    const viewUrl = getViewUrl(doc);
+    window.open(viewUrl, '_blank');
+  };
 
   return (
     <>
@@ -145,40 +200,22 @@ export function PhotoGrid({ files = [], maxShow = 4 }) {
       )}
         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
           {docs.map((doc, i) => {
-            const encodedId = encodeURIComponent(doc.public_id || '');
-            const encodedName = encodeURIComponent(doc.name || 'document');
-            
-            // Primary: Proxy via Backend (fixes CORS for some browsers)
-            const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
-               ? baseUrl.replace('http://', 'https://') 
-               : baseUrl;
-            const proxyUrl = doc.public_id && doc.public_id.includes('/')
-              ? `${secureBase}/api/proxy-file/${encodedId}?resource_type=raw&filename=${encodedName}`
-              : doc.url;
-            
-            // Secondary: Direct Cloudinary with Attachment Flag (failsafe/fast)
-            let directUrl = doc.url;
-            if (doc.url && doc.url.includes('cloudinary.com')) {
-              directUrl = doc.url.includes('/upload/') 
-                ? doc.url.replace('/upload/', `/upload/fl_attachment:${encodedName}/`)
-                : doc.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodedName}/`);
-            }
-
             return (
               <div key={i} style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
-                <a href={proxyUrl} target="_blank" rel="noreferrer"
+                <a href={getViewUrl(doc)} onClick={(e) => handleDocOpen(e, doc)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
-                    color: '#475569', textDecoration: 'none', fontSize: '13px', borderRight: '1px solid #e2e8f0'
+                    color: '#475569', textDecoration: 'none', fontSize: '13px', borderRight: '1px solid #e2e8f0',
+                    cursor: 'pointer'
                   }}>
                   <FileText size={14} />
                   <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</span>
                 </a>
-                <a href={directUrl || proxyUrl} download={doc.name} target="_blank" rel="noreferrer"
-                  style={{ padding: '6px 8px', color: '#6366f1', display: 'flex', alignItems: 'center', cursor: 'pointer', background: '#fff' }}
+                <button onClick={(e) => handleDocDownload(e, doc)}
+                  style={{ padding: '6px 8px', color: '#6366f1', display: 'flex', alignItems: 'center', cursor: 'pointer', background: '#fff', border: 'none' }}
                   title="Download this file">
                   <Download size={14} />
-                </a>
+                </button>
               </div>
             );
           })}
