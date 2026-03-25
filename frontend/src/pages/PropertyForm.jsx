@@ -221,9 +221,22 @@ export default function PropertyForm({ mode = 'add' }) {
               const baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
               const encodedId = encodeURIComponent(f.public_id || '');
               const encodedName = encodeURIComponent(f.name || 'document');
+              
+              // Proxy URL (Primary for secure context)
+              const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
+                ? baseUrl.replace('http://', 'https://') 
+                : baseUrl;
               const proxyUrl = f.public_id && f.public_id.includes('/')
-                ? `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`
+                ? `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`
                 : f.url;
+
+              // Direct URL with attachment flag (Failsafe)
+              let directUrl = f.url;
+              if (f.url && f.url.includes('cloudinary.com')) {
+                directUrl = f.url.includes('/upload/') 
+                  ? f.url.replace('/upload/', `/upload/fl_attachment:${encodedName}/`)
+                  : f.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodedName}/`);
+              }
 
               return (
                 <div key={i} style={{ 
@@ -239,7 +252,7 @@ export default function PropertyForm({ mode = 'add' }) {
                     {f.type === 'image' ? <ImageIcon size={14} color="#6366f1" /> : <FileText size={14} color="#64748b" />}
                     <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
                   </a>
-                  <a href={proxyUrl} download={f.name} target="_blank" rel="noreferrer"
+                  <a href={directUrl || proxyUrl} download={f.name} target="_blank" rel="noreferrer"
                     style={{ padding: '6px 8px', color: '#6366f1', background: '#fff', display: 'flex', alignItems: 'center' }}
                     title="Download">
                     <Download size={14} />

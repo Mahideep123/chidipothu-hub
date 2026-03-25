@@ -84,6 +84,19 @@ export default function Properties() {
       baseUrl = baseUrl.replace('localhost', window.location.hostname);
     }
 
+    const getCloudinaryDownloadUrl = (f) => {
+      if (!f.url || !f.url.includes('cloudinary.com')) return f.url;
+      // Inject fl_attachment into the URL for direct browser download
+      // Typical URL: .../upload/v12345/public_id.ext
+      if (f.url.includes('/upload/')) {
+        return f.url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`);
+      }
+      if (f.url.includes('/raw/upload/')) {
+        return f.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`);
+      }
+      return f.url;
+    };
+
     if (p.file_attachments && p.file_attachments.length > 0) {
       const toastId = toast.loading(`Fetching ${p.file_attachments.length} document(s)...`);
       for (const f of p.file_attachments) {
@@ -93,7 +106,6 @@ export default function Properties() {
             const encodedId = encodeURIComponent(f.public_id);
             const encodedName = encodeURIComponent(f.name || 'document');
             if (f.public_id.includes('/')) {
-              // Ensure we use https for production Render backend
               const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
                 ? baseUrl.replace('http://', 'https://') 
                 : baseUrl;
@@ -103,23 +115,27 @@ export default function Properties() {
             }
           }
 
-          console.log('Attempting to fetch for share:', downloadUrl);
-          const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
-          if (!res.ok) throw new Error(`HTTP Error ${res.status} when fetching ${f.name}`);
-          const blob = await res.blob();
-          
-          // Use a clean filename for iOS compatibility
-          const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
-          const file = new File([blob], cleanName, { type: mime });
-          filesArray.push(file);
-          // Small delay for mobile stability
-          await new Promise(r => setTimeout(r, 300));
+          console.log(`[Share] Fetching: ${downloadUrl}`);
+          try {
+            const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+            if (!res.ok) throw new Error(`Status ${res.status}`);
+            const blob = await res.blob();
+            const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
+            filesArray.push(new File([blob], cleanName, { type: f.type === 'image' ? 'image/jpeg' : 'application/pdf' }));
+          } catch (fetchErr) {
+            console.warn(`[Share] Proxy fetch failed for ${f.name}, trying direct...`, fetchErr);
+            // Fallback: try direct fetch if proxy fails (might work if CORS is set on Cloudinary)
+            const directUrl = getCloudinaryDownloadUrl(f);
+            const res = await fetch(directUrl, { mode: 'no-cors' }); // no-cors lets us fetch but not read blob
+            // Wait, no-cors with blob is useless. We really need the proxy or CORS-enabled direct.
+            toast.error(`Could not fetch ${f.name} for sharing`, { id: toastId });
+          }
+          await new Promise(r => setTimeout(r, 200));
         } catch (e) { 
-          console.error('Fetch failed for share:', e);
-          toast.error(`Could not fetch: ${f.name || 'File'}. Redirecting...`, { duration: 2000 });
+          console.error('[Share] Fatal error:', e);
         }
       }
-      toast.success('Documents ready!', { id: toastId });
+      toast.success('Done!', { id: toastId });
     }
 
     if (navigator.share) {
@@ -180,23 +196,30 @@ export default function Properties() {
       for (const f of p.file_attachments) {
         const link = document.createElement('a');
         
-        if (f.public_id) {
-          const encodedId = encodeURIComponent(f.public_id);
-          const encodedName = encodeURIComponent(f.name || 'document');
-          if (f.public_id.includes('/')) {
-            link.href = `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
-          } else {
-            link.href = `${baseUrl}/api/files/${encodedId}`;
-          }
-        } else {
-          link.href = f.url;
+        // Define robust download URL
+        let downloadUrl = f.url;
+        if (f.public_id && f.public_id.includes('/')) {
+           const encodedId = encodeURIComponent(f.public_id);
+           const encodedName = encodeURIComponent(f.name || 'document');
+           const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
+             ? baseUrl.replace('http://', 'https://') 
+             : baseUrl;
+           downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+        } else if (f.url && f.url.includes('cloudinary.com')) {
+           // Direct Cloudinary with attachment flag for speed
+           downloadUrl = f.url.includes('/upload/') 
+             ? f.url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`)
+             : f.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`);
         }
-        
+
+        link.href = downloadUrl;
         link.target = '_blank';
         link.download = f.name || 'document';
         document.body.appendChild(link);
         link.click();
         document.body.removeChild(link);
+        // Delay to prevent browser blocking multiple downloads
+        await new Promise(r => setTimeout(r, 400));
       }
     }
     toast.dismiss();

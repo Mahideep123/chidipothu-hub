@@ -31,6 +31,7 @@ if os.getenv("FRONTEND_URL"):
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app", # Allow all Vercel previews/domains
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -250,37 +251,42 @@ async def delete_file(public_id: str, current_user: dict = Depends(get_current_u
 
 @app.get("/api/proxy-file/{public_id:path}")
 def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None):
-    # Try to get the direct URL from Cloudinary
     try:
+        # Clean public_id from potential encoded parts if it was passed double-encoded
+        clean_id = urllib.parse.unquote(public_id)
+        
         url, _ = cloudinary.utils.cloudinary_url(
-            public_id, 
+            clean_id, 
             resource_type=resource_type, 
             secure=True,
             flags="attachment" if filename else None
         )
-    except:
-        url = public_id # Fallback if public_id is already a URL
-    
-    try:
-        # Use a simple request
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response = urllib.request.urlopen(req, timeout=12)
         
-        headers = {}
+        # Ensure the URL is properly escaped for urllib
+        safe_url = url.replace(" ", "%20")
+        
+        req = urllib.request.Request(safe_url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = urllib.request.urlopen(req, timeout=15)
+        
+        headers = {
+            "Access-Control-Allow-Origin": "*", # Force CORS friendliness on the proxy stream
+            "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
+        }
         if filename:
             from urllib.parse import quote
             safe_filename = quote(filename)
             headers["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
         
-        return StreamingResponse(
-            response, 
-            headers=headers,
-            media_type=response.headers.get("Content-Type", "application/octet-stream")
-        )
+        return StreamingResponse(response, headers=headers)
     except Exception as e:
-        print(f"Proxy error: {str(e)}")
-        from fastapi.responses import RedirectResponse
-        return RedirectResponse(url)
+        print(f"Proxy critical error: {str(e)}")
+        # If proxying truly fails, redirect to the direct Cloudinary URL as last resort
+        try:
+           fallback_url, _ = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type, secure=True)
+           from fastapi.responses import RedirectResponse
+           return RedirectResponse(fallback_url)
+        except:
+           raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/files/{file_id}")
 async def get_file(file_id: str):
