@@ -217,32 +217,41 @@ export default function PropertyForm({ mode = 'add' }) {
 
         {form.file_attachments.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {form.file_attachments.map((f, i) => (
-              <div key={i} style={{ 
-                display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '8px', 
-                border: '1px solid #e2e8f0', overflow: 'hidden' 
-              }}>
-                <a href={f.url} target="_blank" rel="noreferrer"
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
-                    color: '#374151', textDecoration: 'none', fontSize: '12px', flex: 1,
-                    borderRight: '1px solid #e2e8f0'
-                  }}>
-                  {f.type === 'image' ? <ImageIcon size={14} color="#6366f1" /> : <FileText size={14} color="#64748b" />}
-                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
-                </a>
-                <a href={f.url} download={f.name} target="_blank" rel="noreferrer"
-                  style={{ padding: '6px 8px', color: '#6366f1', background: '#fff', display: 'flex', alignItems: 'center' }}
-                  title="Download">
-                  <Download size={14} />
-                </a>
-                <button onClick={() => removeFile(i)} 
-                  style={{ background: '#fee2e2', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px 8px', display: 'flex' }}
-                  title="Remove">
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
+            {form.file_attachments.map((f, i) => {
+              const baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
+              const encodedId = encodeURIComponent(f.public_id || '');
+              const encodedName = encodeURIComponent(f.name || 'document');
+              const proxyUrl = f.public_id && f.public_id.includes('/')
+                ? `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`
+                : f.url;
+
+              return (
+                <div key={i} style={{ 
+                  display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '8px', 
+                  border: '1px solid #e2e8f0', overflow: 'hidden' 
+                }}>
+                  <a href={proxyUrl} target="_blank" rel="noreferrer"
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
+                      color: '#374151', textDecoration: 'none', fontSize: '12px', flex: 1,
+                      borderRight: '1px solid #e2e8f0'
+                    }}>
+                    {f.type === 'image' ? <ImageIcon size={14} color="#6366f1" /> : <FileText size={14} color="#64748b" />}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                  </a>
+                  <a href={proxyUrl} download={f.name} target="_blank" rel="noreferrer"
+                    style={{ padding: '6px 8px', color: '#6366f1', background: '#fff', display: 'flex', alignItems: 'center' }}
+                    title="Download">
+                    <Download size={14} />
+                  </a>
+                  <button onClick={() => removeFile(i)} 
+                    style={{ background: '#fee2e2', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px 8px', display: 'flex' }}
+                    title="Remove">
+                    <X size={14} />
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </Section>

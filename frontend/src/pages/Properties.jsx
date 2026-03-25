@@ -89,12 +89,16 @@ export default function Properties() {
       for (const f of p.file_attachments) {
         try {
           let downloadUrl = f.url;
-          if (f.public_id && f.public_id.includes('/')) {
-            downloadUrl = `${baseUrl}/api/proxy-file/${f.public_id}?resource_type=${f.type === 'image' ? 'image' : 'raw'}`;
-          } else if (f.public_id) {
-            downloadUrl = `${baseUrl}/api/files/${f.public_id}`;
+          if (f.public_id) {
+            const encodedId = encodeURIComponent(f.public_id);
+            const encodedName = encodeURIComponent(f.name || 'document');
+            if (f.public_id.includes('/')) {
+              downloadUrl = `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+            } else {
+              downloadUrl = `${baseUrl}/api/files/${encodedId}`;
+            }
           }
-          
+
           let mime = 'application/octet-stream';
           if (f.name) {
             const name = f.name.toLowerCase();
@@ -181,10 +185,16 @@ export default function Properties() {
       for (const f of p.file_attachments) {
         const link = document.createElement('a');
         
-        if (f.public_id && !f.public_id.includes('/')) {
-           link.href = `${baseUrl}/api/files/${f.public_id}`; // Local MongoDB
+        if (f.public_id) {
+          const encodedId = encodeURIComponent(f.public_id);
+          const encodedName = encodeURIComponent(f.name || 'document');
+          if (f.public_id.includes('/')) {
+            link.href = `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+          } else {
+            link.href = `${baseUrl}/api/files/${encodedId}`;
+          }
         } else {
-           link.href = f.url; // Direct Cloudinary link natively supported for download loops
+          link.href = f.url;
         }
         
         link.target = '_blank';

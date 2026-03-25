@@ -249,8 +249,8 @@ async def delete_file(public_id: str, current_user: dict = Depends(get_current_u
         raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/proxy-file/{public_id:path}")
-def proxy_file(public_id: str, resource_type: str = "raw"):
-    # Fix for double-slashes or unexpected formatting in public_id
+def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None):
+    # Fix for public_id that might already be a URL or needs formatting
     if public_id.startswith("http"):
         url = public_id
     else:
@@ -258,12 +258,22 @@ def proxy_file(public_id: str, resource_type: str = "raw"):
         url, _ = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type, secure=True)
     
     try:
-        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response = urllib.request.urlopen(req, timeout=10)
-        return StreamingResponse(
-            response, 
-            media_type=response.headers.get("Content-Type", "application/octet-stream")
-        )
+        # Handle all special chars in the fetched URL
+        from urllib.parse import quote
+        safe_url = quote(url, safe=":/%?&=")
+        
+        req = urllib.request.Request(safe_url, headers={'User-Agent': 'Mozilla/5.0'})
+        response = urllib.request.urlopen(req, timeout=15)
+        
+        headers = {
+            "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
+        }
+        if filename:
+            # Force download with the given filename
+            safe_filename = quote(filename)
+            headers["Content-Disposition"] = f'attachment; filename="{safe_filename}"; filename*=UTF-8\'\'{safe_filename}'
+
+        return StreamingResponse(response, headers=headers)
     except Exception as e:
         print(f"Proxy error for {url}: {str(e)}")
         # Fallback redirect if proxying fails
