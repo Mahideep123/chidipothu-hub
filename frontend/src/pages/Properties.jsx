@@ -193,34 +193,46 @@ export default function Properties() {
     }
 
     if (p.file_attachments && p.file_attachments.length > 0) {
+      const toastId = toast.loading('Preparing downloads...');
       for (const f of p.file_attachments) {
-        const link = document.createElement('a');
-        
-        // Define robust download URL
-        let downloadUrl = f.url;
-        if (f.public_id && f.public_id.includes('/')) {
-           const encodedId = encodeURIComponent(f.public_id);
-           const encodedName = encodeURIComponent(f.name || 'document');
-           const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
-             ? baseUrl.replace('http://', 'https://') 
-             : baseUrl;
-           downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
-        } else if (f.url && f.url.includes('cloudinary.com')) {
-           // Direct Cloudinary with attachment flag for speed
-           downloadUrl = f.url.includes('/upload/') 
-             ? f.url.replace('/upload/', `/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`)
-             : f.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodeURIComponent(f.name || 'document')}/`);
-        }
+        try {
+          let downloadUrl = f.url;
+          if (f.public_id && f.public_id.includes('/')) {
+             const encodedId = encodeURIComponent(f.public_id);
+             const encodedName = encodeURIComponent(f.name || 'document');
+             const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
+               ? baseUrl.replace('http://', 'https://') 
+               : baseUrl;
+             downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+          }
 
-        link.href = downloadUrl;
-        link.target = '_blank';
-        link.download = f.name || 'document';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        // Delay to prevent browser blocking multiple downloads
-        await new Promise(r => setTimeout(r, 400));
+          console.log(`[Download] Fetching Blob: ${downloadUrl}`);
+          const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+          if (!res.ok) throw new Error(`Status ${res.status}`);
+          const blob = await res.blob();
+          
+          const blobUrl = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = f.name || 'document';
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          window.URL.revokeObjectURL(blobUrl);
+
+          // Delay to prevent browser blocking multiple downloads
+          await new Promise(r => setTimeout(r, 600));
+        } catch (err) {
+          console.error('[Download] Failed for', f.name, err);
+          // Failsafe: try direct link if blob fails
+          const link = document.createElement('a');
+          link.href = f.url;
+          link.target = '_blank';
+          link.download = f.name || 'document';
+          link.click();
+        }
       }
+      toast.success('Downloads started!', { id: toastId });
     }
     toast.dismiss();
     toast.success('Downloads started!');

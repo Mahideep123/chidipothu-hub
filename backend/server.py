@@ -12,7 +12,7 @@ from dotenv import load_dotenv
 import base64
 import urllib.request
 import urllib.parse
-from fastapi.responses import StreamingResponse, Response
+from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 
 load_dotenv()
 
@@ -251,42 +251,47 @@ async def delete_file(public_id: str, current_user: dict = Depends(get_current_u
 
 @app.get("/api/proxy-file/{public_id:path}")
 def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None):
+    # Log for debugging (Render logs)
+    print(f"DEBUG: Proxy request for {public_id}, type={resource_type}, name={filename}")
+    
     try:
-        # Clean public_id from potential encoded parts if it was passed double-encoded
-        clean_id = urllib.parse.unquote(public_id)
+        # Check Cloudinary config
+        if not cloudinary.config().cloud_name:
+            print("ERROR: Cloudinary config missing!")
+            # If config is missing, try to use public_id directly if it looks like a URL
+            if public_id.startswith("http"):
+                url = public_id
+            else:
+                return JSONResponse({"error": "Cloudinary config missing"}, status_code=500)
+        else:
+            clean_id = urllib.parse.unquote(public_id)
+            url, _ = cloudinary.utils.cloudinary_url(
+                clean_id, 
+                resource_type=resource_type, 
+                secure=True
+            )
         
-        url, _ = cloudinary.utils.cloudinary_url(
-            clean_id, 
-            resource_type=resource_type, 
-            secure=True,
-            flags="attachment" if filename else None
-        )
+        print(f"DEBUG: Internal Cloudinary URL: {url}")
         
-        # Ensure the URL is properly escaped for urllib
-        safe_url = url.replace(" ", "%20")
-        
-        req = urllib.request.Request(safe_url, headers={'User-Agent': 'Mozilla/5.0'})
+        # Simple fetch with urllib
+        req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
         response = urllib.request.urlopen(req, timeout=15)
         
         headers = {
-            "Access-Control-Allow-Origin": "*", # Force CORS friendliness on the proxy stream
+            "Access-Control-Allow-Origin": "*",
             "Content-Type": response.headers.get("Content-Type", "application/octet-stream")
         }
         if filename:
             from urllib.parse import quote
-            safe_filename = quote(filename)
+            safe_filename = quote(filename).replace("%20", "_") # Use underscores for headers
             headers["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
         
         return StreamingResponse(response, headers=headers)
     except Exception as e:
         print(f"Proxy critical error: {str(e)}")
-        # If proxying truly fails, redirect to the direct Cloudinary URL as last resort
-        try:
-           fallback_url, _ = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type, secure=True)
-           from fastapi.responses import RedirectResponse
-           return RedirectResponse(fallback_url)
-        except:
-           raise HTTPException(status_code=500, detail=str(e))
+        # If it fails, maybe it's a CORS issue on the fetch itself. 
+        # Return a meaningful error to the frontend if possible
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/api/files/{file_id}")
 async def get_file(file_id: str):
