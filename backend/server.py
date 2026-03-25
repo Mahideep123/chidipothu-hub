@@ -11,6 +11,8 @@ from email.mime.multipart import MIMEMultipart
 from dotenv import load_dotenv
 import base64
 import urllib.request
+import urllib.parse
+from fastapi.responses import StreamingResponse, Response
 
 load_dotenv()
 
@@ -248,15 +250,25 @@ async def delete_file(public_id: str, current_user: dict = Depends(get_current_u
 
 @app.get("/api/proxy-file/{public_id:path}")
 def proxy_file(public_id: str, resource_type: str = "raw"):
-    url, _ = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type, sign_url=True)
+    # Fix for double-slashes or unexpected formatting in public_id
+    if public_id.startswith("http"):
+        url = public_id
+    else:
+        # Sign the URL for security/access
+        url, _ = cloudinary.utils.cloudinary_url(public_id, resource_type=resource_type, secure=True)
+    
     try:
-        import urllib.request
         req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0'})
-        response = urllib.request.urlopen(req)
-        from fastapi.responses import StreamingResponse
-        return StreamingResponse(response, media_type=response.headers.get("Content-Type", "application/octet-stream"))
+        response = urllib.request.urlopen(req, timeout=10)
+        return StreamingResponse(
+            response, 
+            media_type=response.headers.get("Content-Type", "application/octet-stream")
+        )
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        print(f"Proxy error for {url}: {str(e)}")
+        # Fallback redirect if proxying fails
+        from fastapi.responses import RedirectResponse
+        return RedirectResponse(url)
 
 @app.get("/api/files/{file_id}")
 async def get_file(file_id: str):

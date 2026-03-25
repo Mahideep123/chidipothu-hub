@@ -218,14 +218,28 @@ export default function PropertyForm({ mode = 'add' }) {
         {form.file_attachments.length > 0 && (
           <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
             {form.file_attachments.map((f, i) => (
-              <div key={i} style={{
-                display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
-                background: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0', maxWidth: '200px',
+              <div key={i} style={{ 
+                display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '8px', 
+                border: '1px solid #e2e8f0', overflow: 'hidden' 
               }}>
-                {f.type === 'image' ? <ImageIcon size={14} color="#6366f1" /> : <FileText size={14} color="#64748b" />}
-                <span style={{ fontSize: '12px', color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{f.name}</span>
-                <button onClick={() => removeFile(i)} style={{ background: 'none', border: 'none', cursor: 'pointer', color: '#94a3b8', padding: 0, display: 'flex', flexShrink: 0 }}>
-                  <X size={12} />
+                <a href={f.url} target="_blank" rel="noreferrer"
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: '6px', padding: '6px 10px',
+                    color: '#374151', textDecoration: 'none', fontSize: '12px', flex: 1,
+                    borderRight: '1px solid #e2e8f0'
+                  }}>
+                  {f.type === 'image' ? <ImageIcon size={14} color="#6366f1" /> : <FileText size={14} color="#64748b" />}
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{f.name}</span>
+                </a>
+                <a href={f.url} download={f.name} target="_blank" rel="noreferrer"
+                  style={{ padding: '6px 8px', color: '#6366f1', background: '#fff', display: 'flex', alignItems: 'center' }}
+                  title="Download">
+                  <Download size={14} />
+                </a>
+                <button onClick={() => removeFile(i)} 
+                  style={{ background: '#fee2e2', border: 'none', cursor: 'pointer', color: '#ef4444', padding: '6px 8px', display: 'flex' }}
+                  title="Remove">
+                  <X size={14} />
                 </button>
               </div>
             ))}
