@@ -20,8 +20,7 @@ origins = [
     "http://localhost:3000",
     "http://localhost:3001",
     "https://chidipothu-hub-zfpr.vercel.app",
-    "https://chidipothu-hub.vercel.app",
-    "https://chidipothusridhar.vercel.app"
+    "https://chidipothu-hub.vercel.app"
 ]
 if os.getenv("FRONTEND_URL"):
     origins.append(os.getenv("FRONTEND_URL"))

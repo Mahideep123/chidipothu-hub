@@ -141,21 +141,25 @@ export function PhotoGrid({ files = [], maxShow = 4 }) {
           </div>
         </div>
       )}
-      {docs.length > 0 && (
-        <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', marginTop: '6px' }}>
+        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '8px' }}>
           {docs.map((doc, i) => (
-            <a key={i} href={doc.url} target="_blank" rel="noreferrer"
-              style={{
-                display: 'flex', alignItems: 'center', gap: '4px', padding: '4px 8px',
-                background: '#f1f5f9', borderRadius: '6px', color: '#475569',
-                textDecoration: 'none', fontSize: '12px', border: '1px solid #e2e8f0',
-              }}>
-              <FileText size={12} />
-              <span style={{ maxWidth: '100px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</span>
-            </a>
+            <div key={i} style={{ display: 'flex', alignItems: 'center', background: '#f1f5f9', borderRadius: '8px', border: '1px solid #e2e8f0', overflow: 'hidden' }}>
+              <a href={doc.url} target="_blank" rel="noreferrer"
+                style={{
+                  display: 'flex', alignItems: 'center', gap: '4px', padding: '6px 10px',
+                  color: '#475569', textDecoration: 'none', fontSize: '13px', borderRight: '1px solid #e2e8f0'
+                }}>
+                <FileText size={14} />
+                <span style={{ maxWidth: '120px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.name}</span>
+              </a>
+              <a href={doc.url} download={doc.name} target="_blank" rel="noreferrer"
+                style={{ padding: '6px 8px', color: '#6366f1', display: 'flex', alignItems: 'center', cursor: 'pointer', background: '#fff' }}
+                title="Download this file">
+                <Download size={14} />
+              </a>
+            </div>
           ))}
         </div>
-      )}
       {galleryOpen && <Gallery files={files} startIndex={startIdx} onClose={() => setGalleryOpen(false)} />}
     </>
   );

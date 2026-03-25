@@ -101,12 +101,19 @@ export default function Properties() {
             if (name.endsWith('.pdf')) mime = 'application/pdf';
             else if (name.endsWith('.png')) mime = 'image/png';
             else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mime = 'image/jpeg';
+            else if (name.endsWith('.docx')) mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+            else if (name.endsWith('.doc')) mime = 'application/msword';
+            else if (name.endsWith('.xlsx')) mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+            else if (name.endsWith('.xls')) mime = 'application/vnd.ms-excel';
           }
 
           const res = await fetch(downloadUrl);
           if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
           const blob = await res.blob();
-          const file = new File([blob], f.name || 'document', { type: mime });
+          
+          // Use a clean filename for iOS compatibility
+          const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
+          const file = new File([blob], cleanName, { type: mime });
           filesArray.push(file);
         } catch (e) { 
           console.error('Fetch failed:', e);
