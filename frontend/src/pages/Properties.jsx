@@ -93,35 +93,30 @@ export default function Properties() {
             const encodedId = encodeURIComponent(f.public_id);
             const encodedName = encodeURIComponent(f.name || 'document');
             if (f.public_id.includes('/')) {
-              downloadUrl = `${baseUrl}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+              // Ensure we use https for production Render backend
+              const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
+                ? baseUrl.replace('http://', 'https://') 
+                : baseUrl;
+              downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
             } else {
               downloadUrl = `${baseUrl}/api/files/${encodedId}`;
             }
           }
 
-          let mime = 'application/octet-stream';
-          if (f.name) {
-            const name = f.name.toLowerCase();
-            if (name.endsWith('.pdf')) mime = 'application/pdf';
-            else if (name.endsWith('.png')) mime = 'image/png';
-            else if (name.endsWith('.jpg') || name.endsWith('.jpeg')) mime = 'image/jpeg';
-            else if (name.endsWith('.docx')) mime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-            else if (name.endsWith('.doc')) mime = 'application/msword';
-            else if (name.endsWith('.xlsx')) mime = 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-            else if (name.endsWith('.xls')) mime = 'application/vnd.ms-excel';
-          }
-
-          const res = await fetch(downloadUrl);
-          if (!res.ok) throw new Error(`HTTP Error ${res.status}`);
+          console.log('Attempting to fetch for share:', downloadUrl);
+          const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
+          if (!res.ok) throw new Error(`HTTP Error ${res.status} when fetching ${f.name}`);
           const blob = await res.blob();
           
           // Use a clean filename for iOS compatibility
           const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
           const file = new File([blob], cleanName, { type: mime });
           filesArray.push(file);
+          // Small delay for mobile stability
+          await new Promise(r => setTimeout(r, 300));
         } catch (e) { 
-          console.error('Fetch failed:', e);
-          toast.error(`Failed to fetch: ${f.name || 'File'}`, { id: toastId });
+          console.error('Fetch failed for share:', e);
+          toast.error(`Could not fetch: ${f.name || 'File'}. Redirecting...`, { duration: 2000 });
         }
       }
       toast.success('Documents ready!', { id: toastId });
