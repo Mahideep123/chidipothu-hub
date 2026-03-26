@@ -16,6 +16,7 @@ const LOC_CONFIG = [
   { key: 'districts', label: 'Districts', icon: MapPin, color: '#10b981' },
   { key: 'mandals', label: 'Mandals', icon: Navigation, color: '#ec4899' },
   { key: 'villages', label: 'Villages', icon: Flag, color: '#f59e0b' },
+  { key: 'cities', label: 'Cities', icon: Building2, color: '#6366f1' },
 ];
 
 const card = { background: '#fff', borderRadius: '14px', padding: '20px', boxShadow: '0 2px 8px rgba(0,0,0,0.06)' };

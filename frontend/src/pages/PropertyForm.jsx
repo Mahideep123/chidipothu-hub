@@ -4,7 +4,15 @@ import { createProperty, updateProperty, getProperty, uploadFile, deleteFile } f
 import { ArrowLeft, Upload, X, FileText, ImageIcon, Loader, Download } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const TYPES = ['House', 'Shop', 'Agriculture Land', 'Site', 'Commercial Godown'];
+const TYPES = ['House/Building', 'Shop', 'Agriculture Land', 'Sites/Plots', 'Commercial Property', 'Flat'];
+
+const CHECKLIST_ITEMS = [
+  "Sale Deed Original Copy", "Parent/Link Document", "Sale Agreement", 
+  "Encumbrance Certificate", "Pass Book", "1B Copy", "Adangal", "Patta", "Chitta", 
+  "FMB Sketch", "Plan Approval DTCP/CMDA", "BBMP/Others", "Property Tax Receipts", 
+  "MOD/Loan Closure Doc/Bank NOC", "Seller ID Proof (Aadhar/Pan)", "Power of Attorney", 
+  "Engineer Valuation", "Legal Opinion", "EB Bill"
+];
 const UNITS = ['Acres', 'Square Yards', 'Square Feet', 'Guntas', 'Cents'];
 
 const FIELDS = [
@@ -41,7 +49,17 @@ const Grid = ({ children }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>{children}</div>
 );
 
-const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '', extent_value: '', extent_unit: 'Acres', file_attachments: [] };
+const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '',
+    extent_value: '',
+    extent_unit: 'Acres',
+    location_type: 'Village',
+    city: '',
+    road_street: '',
+    area: '',
+    pincode: '',
+    document_checklist: CHECKLIST_ITEMS.map(name => ({ name, pages: '' })),
+    file_attachments: [],
+  };
 
 export default function PropertyForm({ mode = 'add' }) {
   const navigate = useNavigate();
@@ -56,7 +74,18 @@ export default function PropertyForm({ mode = 'add' }) {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (mode === 'edit' && id) {
-      getProperty(id).then((r) => { setForm({ ...empty, ...r.data }); }).catch(() => toast.error('Failed to load')).finally(() => setFetching(false));
+      getProperty(id).then((r) => {
+        const fetchedForm = { ...empty, ...r.data };
+        // Ensure document_checklist is initialized if not present or incomplete
+        if (!fetchedForm.document_checklist || fetchedForm.document_checklist.length === 0) {
+          fetchedForm.document_checklist = CHECKLIST_ITEMS.map(name => ({ name, pages: '' }));
+        } else {
+          // Merge fetched checklist with default to ensure all items are present
+          const existingChecklistMap = new Map(fetchedForm.document_checklist.map(item => [item.name, item]));
+          fetchedForm.document_checklist = CHECKLIST_ITEMS.map(name => existingChecklistMap.get(name) || { name, pages: '' });
+        }
+        setForm(fetchedForm);
+      }).catch(() => toast.error('Failed to load')).finally(() => setFetching(false));
     }
   }, [id, mode]);
 
@@ -98,6 +127,19 @@ export default function PropertyForm({ mode = 'add' }) {
       toast.error('Property Name, Door No., Owner Name and Document Number are required');
       return;
     }
+    if (!form.state || !form.district || !form.mandal) {
+      toast.error('State, District, and Mandal are mandatory');
+      return;
+    }
+    if (form.location_type === 'Village' && !form.village) {
+      toast.error('Village is mandatory');
+      return;
+    }
+    if (form.location_type === 'City' && !form.city) {
+      toast.error('City is mandatory');
+      return;
+    }
+
     setLoading(true);
     try {
       if (mode === 'edit') { await updateProperty(id, form); toast.success('Property updated!'); }
@@ -109,6 +151,12 @@ export default function PropertyForm({ mode = 'add' }) {
 
   if (fetching) return <div style={{ textAlign: 'center', padding: '60px', color: '#64748b' }}>Loading...</div>;
 
+  const sectionStyle = { background: '#fff', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' };
+  const sectionTitleStyle = { fontFamily: "'Manrope',sans-serif", fontSize: '15px', fontWeight: 700, color: '#1e293b', margin: '0 0 16px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' };
+  const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.4px' };
+  const inputStyle = { ...INPUT_STYLE, onFocus: e => e.target.style.borderColor = '#6366f1', onBlur: e => e.target.style.borderColor = '#e2e8f0' };
+
+
   return (
     <div style={{ maxWidth: '860px', margin: '0 auto' }}>
       <button onClick={() => navigate('/properties')} style={{ display: 'flex', alignItems: 'center', gap: '6px', background: 'none', border: 'none', color: '#6366f1', cursor: 'pointer', fontSize: '14px', marginBottom: '20px', padding: 0 }}>
@@ -119,18 +167,107 @@ export default function PropertyForm({ mode = 'add' }) {
         {mode === 'edit' ? 'Edit Property' : 'Add New Property'}
       </h1>
 
-      {/* Location */}
-      <Section title="Location Details">
-        <Grid>
-          {[['state', 'State *'], ['district', 'District *'], ['mandal', 'Mandal *'], ['village', 'Village *']].map(([key, label]) => (
-            <div key={key}>
-              <label style={LABEL_STYLE}>{label}</label>
-              <input value={form[key]} onChange={(e) => set(key, e.target.value)} placeholder={`Enter ${key}`} style={INPUT_STYLE}
-                onFocus={e => e.target.style.borderColor = '#6366f1'} onBlur={e => e.target.style.borderColor = '#e2e8f0'} />
+      {/* Location Details */}
+      <div style={sectionStyle}>
+        <h3 style={sectionTitleStyle}>Location Details</h3>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
+          <div>
+            <label style={labelStyle}>Location Type <span style={{ color: '#ef4444' }}>*</span></label>
+            <select
+              value={form.location_type}
+              onChange={(e) => setForm({ ...form, location_type: e.target.value })}
+              style={{ ...inputStyle, cursor: 'pointer' }}
+            >
+              <option value="Village">Village</option>
+              <option value="City">City</option>
+            </select>
+          </div>
+          {form.location_type === 'Village' ? (
+            <div>
+              <label style={labelStyle}>Village <span style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                value={form.village}
+                onChange={(e) => setForm({ ...form, village: e.target.value })}
+                placeholder="Enter village name"
+                style={inputStyle}
+                required
+              />
             </div>
-          ))}
-        </Grid>
-      </Section>
+          ) : (
+            <div>
+              <label style={labelStyle}>City <span style={{ color: '#ef4444' }}>*</span></label>
+              <input
+                value={form.city}
+                onChange={(e) => setForm({ ...form, city: e.target.value })}
+                placeholder="Enter city name"
+                style={inputStyle}
+                required
+              />
+            </div>
+          )}
+          <div>
+            <label style={labelStyle}>Mandal <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.mandal}
+              onChange={(e) => setForm({ ...form, mandal: e.target.value })}
+              placeholder="Enter mandal"
+              style={inputStyle}
+              required
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>District <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.district}
+              onChange={(e) => setForm({ ...form, district: e.target.value })}
+              placeholder="Enter district"
+              style={inputStyle}
+              required
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>State <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.state}
+              onChange={(e) => setForm({ ...form, state: e.target.value })}
+              placeholder="Enter state"
+              style={inputStyle}
+              required
+            />
+          </div>
+          {form.location_type === 'City' && (
+            <>
+              <div>
+                <label style={labelStyle}>Road / Street</label>
+                <input
+                  value={form.road_street}
+                  onChange={(e) => setForm({ ...form, road_street: e.target.value })}
+                  placeholder="Enter road/street"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Area</label>
+                <input
+                  value={form.area}
+                  onChange={(e) => setForm({ ...form, area: e.target.value })}
+                  placeholder="Enter area"
+                  style={inputStyle}
+                />
+              </div>
+              <div>
+                <label style={labelStyle}>Pincode</label>
+                <input
+                  value={form.pincode}
+                  onChange={(e) => setForm({ ...form, pincode: e.target.value })}
+                  placeholder="Enter pincode"
+                  style={inputStyle}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
 
       {/* Property Details */}
       <Section title="Property Details">
@@ -179,6 +316,35 @@ export default function PropertyForm({ mode = 'add' }) {
         </Grid>
       </Section>
 
+      {/* Document Check List Index */}
+      <div style={sectionStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px', borderBottom: '2px solid #f1f5f9', paddingBottom: '8px' }}>
+          <h3 style={{ ...sectionTitleStyle, margin: 0 }}>Document Check List Index</h3>
+          <span style={{ fontSize: '14px', fontWeight: 600, color: '#475569' }}>No. of Pages</span>
+        </div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+          {form.document_checklist.map((item, idx) => (
+            <div key={idx} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
+              <div style={{ fontSize: '14px', color: '#1e293b', flex: 1 }}>
+                <span style={{ fontWeight: 600, marginRight: '8px', color: '#64748b' }}>{idx + 1}.</span>
+                {item.name}
+              </div>
+              <input
+                type="text"
+                value={item.pages}
+                onChange={(e) => {
+                  const newList = [...form.document_checklist];
+                  newList[idx].pages = e.target.value;
+                  setForm({ ...form, document_checklist: newList });
+                }}
+                placeholder="0"
+                style={{ ...inputStyle, width: '80px', textAlign: 'center' }}
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+
       {/* Remarks */}
       <Section title="Remarks">
         <label style={LABEL_STYLE}>Additional Notes (max 500 characters)</label>
@@ -221,14 +387,17 @@ export default function PropertyForm({ mode = 'add' }) {
               const baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
               const encodedId = encodeURIComponent(f.public_id || '');
               const encodedName = encodeURIComponent(f.name || 'document');
-              
+
               // Proxy URL (Primary for secure context)
-              const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
-                ? baseUrl.replace('http://', 'https://') 
+              const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost')
+                ? baseUrl.replace('http://', 'https://')
                 : baseUrl;
-              const proxyUrl = f.public_id && f.public_id.includes('/')
-                ? `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`
-                : f.url;
+              let proxyUrl = f.url;
+              if (f.url && f.url.includes('cloudinary') && f.public_id) {
+                proxyUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+              } else if (f.url && f.url.startsWith('/api/')) {
+                proxyUrl = `${secureBase}${f.url}`;
+              }
 
               // Direct URL with attachment flag (Failsafe)
               let directUrl = f.url;
@@ -236,6 +405,8 @@ export default function PropertyForm({ mode = 'add' }) {
                 directUrl = f.url.includes('/upload/') 
                   ? f.url.replace('/upload/', `/upload/fl_attachment:${encodedName}/`)
                   : f.url.replace('/raw/upload/', `/raw/upload/fl_attachment:${encodedName}/`);
+              } else if (f.url && f.url.startsWith('/api/')) {
+                directUrl = `${secureBase}${f.url}`;
               }
 
               return (

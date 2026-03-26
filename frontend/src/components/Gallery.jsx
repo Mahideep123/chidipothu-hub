@@ -132,10 +132,12 @@ export function PhotoGrid({ files = [], maxShow = 4 }) {
 
   // Get proxy URL for reliable download
   const getProxyDownloadUrl = (doc) => {
-    const encodedId = encodeURIComponent(doc.public_id || '');
-    const encodedName = encodeURIComponent(doc.name || 'document');
-    if (doc.public_id && doc.public_id.includes('/')) {
+    if (doc.url && doc.url.includes('cloudinary') && doc.public_id) {
+      const encodedId = encodeURIComponent(doc.public_id || '');
+      const encodedName = encodeURIComponent(doc.name || 'document');
       return `${secureBase}/api/proxy-file/${encodedId}?resource_type=raw&filename=${encodedName}`;
+    } else if (doc.url && doc.url.startsWith('/api/')) {
+      return `${secureBase}${doc.url}`;
     }
     return doc.url;
   };

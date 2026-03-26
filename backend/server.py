@@ -41,6 +41,22 @@ app.add_middleware(
 client = AsyncIOMotorClient(os.getenv("MONGO_URL"))
 db = client[os.getenv("DB_NAME", "chidipothu_hub")]
 
+@app.on_event("startup")
+async def startup_db_client():
+    # Improve search performance with indexes
+    await db.properties.create_index([
+        ("owner_name", "text"), 
+        ("document_number", "text"), 
+        ("survey_number", "text"),
+        ("village", "text")
+    ])
+    await db.properties.create_index("created_at")
+    await db.properties.create_index("property_type")
+    
+    # OTP optimization
+    await db.otps.create_index("email")
+    await db.otps.create_index("expires_at", expireAfterSeconds=0) # Auto-delete expired OTPs
+
 # Cloudinary config
 cloudinary.config(
     cloud_name=os.getenv("CLOUDINARY_CLOUD_NAME"),
@@ -97,6 +113,14 @@ class PropertyCreate(BaseModel):
     remarks: str = ""
     extent_value: str = ""
     extent_unit: str = "Acres"
+    # Location enhancements
+    location_type: str = "Village" # Village | City
+    city: str = ""
+    road_street: str = ""
+    area: str = ""
+    pincode: str = ""
+    # Checklist
+    document_checklist: List[dict] = [] # List of { name: str, pages: str }
     file_attachments: List[FileAttachment] = []
 
 class FileUploadRequest(BaseModel):
@@ -238,12 +262,6 @@ async def upload_file(req: FileUploadRequest, request: Request, current_user: di
 @app.delete("/api/upload/{public_id:path}")
 async def delete_file(public_id: str, current_user: dict = Depends(get_current_user)):
     try:
-        if "/" not in public_id:
-            # Fallback to local MongoDB delete if it doesn't look like a Cloudinary ID
-            from bson import ObjectId
-            await db.files.delete_one({"_id": ObjectId(public_id)})
-            return {"deleted": True}
-        
         cloudinary.uploader.destroy(public_id)
         return {"deleted": True}
     except Exception as e:
@@ -299,30 +317,6 @@ def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None,
         print(f"Proxy critical error: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
 
-@app.get("/api/files/{file_id}")
-async def get_file(file_id: str):
-    from bson import ObjectId
-    try:
-        file_doc = await db.files.find_one({"_id": ObjectId(file_id)})
-        if not file_doc:
-            raise HTTPException(status_code=404, detail="File not found")
-            
-        file_data = base64.b64decode(file_doc["data"])
-        
-        mime = "application/octet-stream"
-        if file_doc["type"] == "image":
-            name_lower = file_doc["name"].lower()
-            if name_lower.endswith(".png"): mime = "image/png"
-            else: mime = "image/jpeg"
-        elif file_doc["type"] == "pdf":
-            mime = "application/pdf"
-        elif file_doc["name"].lower().endswith(".doc") or file_doc["name"].lower().endswith(".docx"):
-            mime = "application/msword"
-
-        from fastapi.responses import Response
-        return Response(content=file_data, media_type=mime)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
 
 # ─── Dashboard ────────────────────────────────────────────────────────────────
 
@@ -334,30 +328,18 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
     for t in types:
         counts[t] = await db.properties.count_documents({"property_type": t})
 
-    pipeline = [
-        {"$group": {"_id": "$state", "count": {"$sum": 1}}},
-        {"$project": {"name": "$_id", "count": 1, "_id": 0}},
-    ]
-    states = await db.properties.aggregate(pipeline).to_list(None)
-
-    dist_pipeline = [{"$group": {"_id": "$district"}}, {"$project": {"name": "$_id", "_id": 0}}]
-    districts = await db.properties.aggregate(dist_pipeline).to_list(None)
-
-    mandal_pipeline = [{"$group": {"_id": "$mandal"}}, {"$project": {"name": "$_id", "_id": 0}}]
-    mandals = await db.properties.aggregate(mandal_pipeline).to_list(None)
-
-    village_pipeline = [{"$group": {"_id": "$village"}}, {"$project": {"name": "$_id", "_id": 0}}]
-    villages = await db.properties.aggregate(village_pipeline).to_list(None)
+    location_stats = {
+        "states": await db.properties.aggregate([{"$group": {"_id": "$state"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
+        "districts": await db.properties.aggregate([{"$group": {"_id": "$district"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
+        "mandals": await db.properties.aggregate([{"$group": {"_id": "$mandal"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
+        "villages": await db.properties.aggregate([{"$group": {"_id": "$village", "type": {"$first": "$location_type"}}}, {"$match": {"type": "Village"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
+        "cities": await db.properties.aggregate([{"$group": {"_id": "$city", "type": {"$first": "$location_type"}}}, {"$match": {"type": "City"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
+    }
 
     return {
         "total": total,
         "by_type": counts,
-        "locations": {
-            "states": states,
-            "districts": districts,
-            "mandals": mandals,
-            "villages": villages,
-        },
+        "locations": location_stats,
     }
 
 # ─── Locations ────────────────────────────────────────────────────────────────
@@ -365,10 +347,14 @@ async def get_dashboard(current_user: dict = Depends(get_current_user)):
 @app.get("/api/locations")
 async def get_locations(current_user: dict = Depends(get_current_user)):
     pipeline = [
-        {"$group": {"_id": {"state": "$state", "district": "$district", "mandal": "$mandal", "village": "$village"}}},
+        {"$group": {"_id": {
+            "state": "$state", "district": "$district", "mandal": "$mandal", 
+            "village": "$village", "city": "$city", "location_type": "$location_type"
+        }}},
         {"$project": {
             "state": "$_id.state", "district": "$_id.district",
-            "mandal": "$_id.mandal", "village": "$_id.village", "_id": 0
+            "mandal": "$_id.mandal", "village": "$_id.village", 
+            "city": "$_id.city", "location_type": "$_id.location_type", "_id": 0
         }}
     ]
     return await db.properties.aggregate(pipeline).to_list(None)
@@ -382,7 +368,7 @@ def serialize_property(p):
 
 @app.get("/api/properties")
 async def get_properties(
-    search: str = "", state: str = "", village: str = "", property_type: str = "",
+    search: str = "", state: str = "", village: str = "", city: str = "", property_type: str = "",
     current_user: dict = Depends(get_current_user)
 ):
     query = {}
@@ -390,6 +376,8 @@ async def get_properties(
         query["state"] = {"$regex": state, "$options": "i"}
     if village:
         query["village"] = {"$regex": village, "$options": "i"}
+    if city:
+        query["city"] = {"$regex": city, "$options": "i"}
     if property_type:
         query["property_type"] = property_type
     if search:
@@ -419,14 +407,48 @@ async def create_property(prop: PropertyCreate, current_user: dict = Depends(get
     doc = prop.model_dump()
     doc["created_at"] = datetime.utcnow()
     doc["updated_at"] = datetime.utcnow()
+    
+    # Ensure mandatory location fields
+    if not (doc.get("state") and doc.get("district") and doc.get("mandal")):
+        raise HTTPException(status_code=400, detail="State, District, and Mandal are mandatory")
+    if doc.get("location_type") == "Village" and not doc.get("village"):
+        raise HTTPException(status_code=400, detail="Village name is mandatory")
+    if doc.get("location_type") == "City" and not doc.get("city"):
+        raise HTTPException(status_code=400, detail="City name is mandatory")
+
     result = await db.properties.insert_one(doc)
     return {"id": str(result.inserted_id), "message": "Property created"}
 
 @app.put("/api/properties/{prop_id}")
 async def update_property(prop_id: str, prop: PropertyCreate, current_user: dict = Depends(get_current_user)):
     from bson import ObjectId
-    doc = prop.dict()
+    # 1. Get old property to compare attachments
+    old_p = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not old_p:
+        raise HTTPException(status_code=404, detail="Property not found")
+        
+    old_pids = {f.get("public_id") for f in old_p.get("file_attachments", []) if f.get("public_id")}
+    new_pids = {f.public_id for f in prop.file_attachments if f.public_id}
+    
+    # 2. Identify and delete removed attachments from Cloudinary
+    removed_pids = old_pids - new_pids
+    for pid in removed_pids:
+        try:
+            cloudinary.uploader.destroy(pid)
+        except Exception as e:
+            print(f"DEBUG: Error deleting derived file {pid} from Cloudinary: {e}")
+
+    # 3. Update MongoDB
+    doc = prop.model_dump()
     doc["updated_at"] = datetime.utcnow()
+    # Ensure mandatory location fields (all of them are now required)
+    if not (doc.get("state") and doc.get("district") and doc.get("mandal")):
+        raise HTTPException(status_code=400, detail="State, District, and Mandal are mandatory")
+    if doc.get("location_type") == "Village" and not doc.get("village"):
+        raise HTTPException(status_code=400, detail="Village name is mandatory")
+    if doc.get("location_type") == "City" and not doc.get("city"):
+        raise HTTPException(status_code=400, detail="City name is mandatory")
+
     result = await db.properties.update_one({"_id": ObjectId(prop_id)}, {"$set": doc})
     if result.matched_count == 0:
         raise HTTPException(status_code=404, detail="Property not found")
@@ -435,10 +457,24 @@ async def update_property(prop_id: str, prop: PropertyCreate, current_user: dict
 @app.delete("/api/properties/{prop_id}")
 async def delete_property(prop_id: str, current_user: dict = Depends(get_current_user)):
     from bson import ObjectId
+    # 1. Get property to find attachments
+    p = await db.properties.find_one({"_id": ObjectId(prop_id)})
+    if not p:
+        raise HTTPException(status_code=404, detail="Property not found")
+        
+    # 2. Delete attachments from Cloudinary
+    for feat in p.get("file_attachments", []):
+        if feat.get("public_id"):
+            try:
+                cloudinary.uploader.destroy(feat["public_id"])
+            except Exception as e:
+                print(f"DEBUG: Error deleting file {feat['public_id']} from Cloudinary: {e}")
+                
+    # 3. Delete from MongoDB
     result = await db.properties.delete_one({"_id": ObjectId(prop_id)})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Property not found")
-    return {"message": "Property deleted"}
+    return {"message": "Property deleted and attachments removed"}
 
 @app.get("/api/")
 async def health():

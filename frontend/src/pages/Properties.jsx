@@ -7,14 +7,15 @@ import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
 
 const TYPE_BADGE = {
-  'House':              { bg: '#dbeafe', color: '#1e40af' },
+  'House/Building':     { bg: '#dbeafe', color: '#1e40af' },
   'Shop':               { bg: '#fef3c7', color: '#92400e' },
   'Agriculture Land':   { bg: '#d1fae5', color: '#065f46' },
-  'Site':               { bg: '#e9d5ff', color: '#6b21a8' },
-  'Commercial Godown':  { bg: '#bfdbfe', color: '#1d4ed8' },
+  'Sites/Plots':        { bg: '#e9d5ff', color: '#6b21a8' },
+  'Commercial Property':{ bg: '#bfdbfe', color: '#1d4ed8' },
+  'Flat':               { bg: '#fce7f3', color: '#9d174d' },
 };
 
-const TYPES = ['All Types', 'House', 'Shop', 'Agriculture Land', 'Site', 'Commercial Godown'];
+const TYPES = ['All Types', 'House/Building', 'Shop', 'Agriculture Land', 'Sites/Plots', 'Commercial Property', 'Flat'];
 
 export default function Properties() {
   const navigate = useNavigate();
@@ -25,8 +26,10 @@ export default function Properties() {
   const [filterType, setFilterType] = useState('');
   const [filterState, setFilterState] = useState('');
   const [filterVillage, setFilterVillage] = useState('');
+  const [filterCity, setFilterCity] = useState('');
   const [states, setStates]     = useState([]);
   const [villages, setVillages] = useState([]);
+  const [cities, setCities]     = useState([]);
   const [deleteId, setDeleteId] = useState(null);
   const [selectedIds, setSelectedIds] = useState(new Set());
 
@@ -37,6 +40,7 @@ export default function Properties() {
         const data = r.data || [];
         setStates([...new Set(data.map(d => d.state).filter(Boolean))]);
         setVillages([...new Set(data.map(d => d.village).filter(Boolean))]);
+        setCities([...new Set(data.map(d => d.city).filter(Boolean))]);
       })
       .catch(() => {});
   }, []);
@@ -49,11 +53,12 @@ export default function Properties() {
       if (filterType && filterType !== 'All Types') params.property_type = filterType;
       if (filterState && filterState !== 'All States')   params.state = filterState;
       if (filterVillage && filterVillage !== 'All Villages') params.village = filterVillage;
+      if (filterCity && filterCity !== 'All Cities') params.city = filterCity;
       const r = await getProperties(params);
       setProps(r.data);
     } catch { toast.error('Failed to load properties'); }
     finally { setLoading(false); }
-  }, [search, filterType, filterState, filterVillage]);
+  }, [search, filterType, filterState, filterVillage, filterCity]);
 
   useEffect(() => { fetchProps(); }, [fetchProps]);
 
@@ -75,7 +80,15 @@ export default function Properties() {
       `Document Location: ${p.document_location || 'N/A'}\n` +
       `Extent: ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : 'N/A'}\n` +
       (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
-      `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
+      `Location: ${p.location_type === 'Village' ? p.village : p.city}, ${[p.mandal, p.district, p.state].filter(Boolean).join(', ')}` +
+      (p.location_type === 'City' ? `\nRoad/Street: ${p.road_street || 'N/A'}\nArea: ${p.area || 'N/A'}\nPincode: ${p.pincode || 'N/A'}` : '');
+
+    if (p.document_checklist && p.document_checklist.some(i => i.pages)) {
+      text += `\n\n*Document Check List Index:*\n`;
+      p.document_checklist.forEach((item, idx) => {
+        if (item.pages) text += `${idx + 1}. ${item.name}: ${item.pages} page(s)\n`;
+      });
+    }
 
     if (p.remarks) text += `\nRemarks: ${p.remarks}`;
 
@@ -124,18 +137,24 @@ export default function Properties() {
             }
           }
 
-          // Strategy 2: Fall back to proxy URL
-          if (!blob && f.public_id && f.public_id.includes('/')) {
+          // Strategy 2: Fall back to proxy URL (for Cloudinary) or direct backend fetch (for MongoDB)
+          if (!blob) {
             try {
-              const encodedId = encodeURIComponent(f.public_id);
-              const encodedName = encodeURIComponent(f.name || 'document');
-              const proxyUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
-              const res = await fetch(proxyUrl, { mode: 'cors', credentials: 'omit' });
+              let fetchUrl = f.url;
+              if (f.url && f.url.includes('cloudinary') && f.public_id) {
+                const encodedId = encodeURIComponent(f.public_id);
+                const encodedName = encodeURIComponent(f.name || 'document');
+                fetchUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+              } else if (f.url && f.url.startsWith('/api/')) {
+                fetchUrl = `${secureBase}${f.url}`;
+              }
+              
+              const res = await fetch(fetchUrl, { mode: 'cors', credentials: 'omit' });
               if (res.ok) {
                 blob = await res.blob();
               }
             } catch (e) {
-              // Proxy also failed
+              // Fetch failed
             }
           }
 
@@ -220,7 +239,15 @@ export default function Properties() {
       `Document Location: ${p.document_location || 'N/A'}\n` +
       `Extent: ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : 'N/A'}\n` +
       (p.property_type === 'Agriculture Land' ? `Land As Per 1B: ${p.land_as_per_1b || 'N/A'}\n` : '') +
-      `Location: ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || 'N/A'}`;
+      `Location: ${p.location_type === 'Village' ? p.village : p.city}, ${[p.mandal, p.district, p.state].filter(Boolean).join(', ')}` +
+      (p.location_type === 'City' ? `\nRoad/Street: ${p.road_street || 'N/A'}\nArea: ${p.area || 'N/A'}\nPincode: ${p.pincode || 'N/A'}` : '');
+
+    if (p.document_checklist && p.document_checklist.some(i => i.pages)) {
+      text += `\n\n*Document Check List Index:*\n`;
+      p.document_checklist.forEach((item, idx) => {
+        if (item.pages) text += `${idx + 1}. ${item.name}: ${item.pages} page(s)\n`;
+      });
+    }
 
     if (p.remarks) text += `\nRemarks: ${p.remarks}`;
 
@@ -244,13 +271,18 @@ export default function Properties() {
       for (const f of p.file_attachments) {
         try {
           let downloadUrl = f.url;
-          if (f.public_id && f.public_id.includes('/')) {
+          if (f.url && f.url.includes('cloudinary') && f.public_id) {
              const encodedId = encodeURIComponent(f.public_id);
              const encodedName = encodeURIComponent(f.name || 'document');
              const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
                ? baseUrl.replace('http://', 'https://') 
                : baseUrl;
              downloadUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
+          } else if (f.url && f.url.startsWith('/api/')) {
+             const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost') 
+               ? baseUrl.replace('http://', 'https://') 
+               : baseUrl;
+             downloadUrl = `${secureBase}${f.url}`;
           }
 
           const res = await fetch(downloadUrl, { mode: 'cors', credentials: 'omit' });
@@ -322,12 +354,26 @@ export default function Properties() {
       'Document Location': p.document_location || '-',
       'Land As Per 1B': p.land_as_per_1b || '-',
       'Extent': p.extent_value ? p.extent_value + ' ' + p.extent_unit : '-',
+      'Location Type': p.location_type || 'Village',
       'Village': p.village || '-',
+      'City': p.city || '-',
+      'Road/Street': p.road_street || '-',
+      'Area': p.area || '-',
+      'Pincode': p.pincode || '-',
       'Mandal': p.mandal || '-',
       'District': p.district || '-',
       'State': p.state || '-',
       'Remarks': p.remarks || '-'
     }));
+
+    // Add checklist items as separate columns
+    selectedProps.forEach((p, i) => {
+      if (p.document_checklist) {
+        p.document_checklist.forEach(item => {
+          exportData[i][`Pages: ${item.name}`] = item.pages || '0';
+        });
+      }
+    });
 
     const worksheet = XLSX.utils.json_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
@@ -386,9 +432,26 @@ export default function Properties() {
                   <div><strong>Doc Location:</strong> ${p.document_location || '-'}</div>
                   <div><strong>Land (1B):</strong> ${p.land_as_per_1b || '-'}</div>
                   <div><strong>Extent:</strong> ${p.extent_value ? p.extent_value + ' ' + p.extent_unit : '-'}</div>
-                  <div><strong>Location:</strong> ${[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '-'}</div>
+                  <div><strong>Location:</strong> ${p.location_type === 'Village' ? p.village : p.city}, ${[p.mandal, p.district, p.state].filter(Boolean).join(', ')}</div>
+                  ${p.location_type === 'City' ? `
+                    <div><strong>Road/Street:</strong> ${p.road_street || '-'}</div>
+                    <div><strong>Area:</strong> ${p.area || '-'}</div>
+                    <div><strong>Pincode:</strong> ${p.pincode || '-'}</div>
+                  ` : ''}
                   <div style="grid-column: span 2;"><strong>Remarks:</strong> ${p.remarks || '-'}</div>
                 </div>
+
+                ${p.document_checklist && p.document_checklist.some(i => i.pages) ? `
+                  <div style="margin-top: 15px; border-top: 1px dashed #ccc; padding-top: 10px;">
+                    <h4 style="margin: 0 0 8px; font-size: 13px;">Document Check List Index</h4>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 4px; font-size: 11px;">
+                      ${p.document_checklist.filter(i => i.pages).map((item, idx) => `
+                        <div>${item.name}: <strong>${item.pages}</strong></div>
+                      `).join('')}
+                    </div>
+                  </div>
+                ` : ''}
+              </div>
               </div>
             `).join('')}
           </div>
@@ -463,6 +526,11 @@ export default function Properties() {
           <select value={filterVillage} onChange={e => setFilterVillage(e.target.value)} style={selStyle}>
             <option value="">All Villages</option>
             {villages.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+
+          <select value={filterCity} onChange={e => setFilterCity(e.target.value)} style={selStyle}>
+            <option value="">All Cities</option>
+            {cities.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
 
           <select value={filterType} onChange={e => setFilterType(e.target.value)} style={selStyle}>
@@ -633,10 +701,13 @@ export default function Properties() {
                     ['LPM No.',                 p.lpm_number],
                     ['Patta No.',               p.patta_number],
                     ['Tax No.',                 p.assessment_number],
-                    ['Mother Doc',              p.mother_document],
+                    ['MOD/NOC',                 p.mother_document],
                     ['Doc Location',            p.document_location],
                     ['Land (1B)',               p.land_as_per_1b],
-                    ['Village',                 p.village],
+                    ['Village/City',            p.location_type === 'Village' ? p.village : p.city],
+                    ['Road/Street',             p.road_street],
+                    ['Area',                    p.area],
+                    ['Pincode',                 p.pincode],
                     ['Mandal',                  p.mandal],
                     ['District',                p.district],
                     ['State',                   p.state],
