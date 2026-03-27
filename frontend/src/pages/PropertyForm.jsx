@@ -172,6 +172,36 @@ export default function PropertyForm({ mode = 'add' }) {
         <h3 style={sectionTitleStyle}>Location Details</h3>
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '12px' }}>
           <div>
+            <label style={labelStyle}>State <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.state}
+              onChange={(e) => setForm({ ...form, state: e.target.value })}
+              placeholder="Enter state"
+              style={inputStyle}
+              required
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>District <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.district}
+              onChange={(e) => setForm({ ...form, district: e.target.value })}
+              placeholder="Enter district"
+              style={inputStyle}
+              required
+            />
+          </div>
+          <div>
+            <label style={labelStyle}>Mandal <span style={{ color: '#ef4444' }}>*</span></label>
+            <input
+              value={form.mandal}
+              onChange={(e) => setForm({ ...form, mandal: e.target.value })}
+              placeholder="Enter mandal"
+              style={inputStyle}
+              required
+            />
+          </div>
+          <div>
             <label style={labelStyle}>Location Type <span style={{ color: '#ef4444' }}>*</span></label>
             <select
               value={form.location_type}
@@ -205,36 +235,6 @@ export default function PropertyForm({ mode = 'add' }) {
               />
             </div>
           )}
-          <div>
-            <label style={labelStyle}>Mandal <span style={{ color: '#ef4444' }}>*</span></label>
-            <input
-              value={form.mandal}
-              onChange={(e) => setForm({ ...form, mandal: e.target.value })}
-              placeholder="Enter mandal"
-              style={inputStyle}
-              required
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>District <span style={{ color: '#ef4444' }}>*</span></label>
-            <input
-              value={form.district}
-              onChange={(e) => setForm({ ...form, district: e.target.value })}
-              placeholder="Enter district"
-              style={inputStyle}
-              required
-            />
-          </div>
-          <div>
-            <label style={labelStyle}>State <span style={{ color: '#ef4444' }}>*</span></label>
-            <input
-              value={form.state}
-              onChange={(e) => setForm({ ...form, state: e.target.value })}
-              placeholder="Enter state"
-              style={inputStyle}
-              required
-            />
-          </div>
           {form.location_type === 'City' && (
             <>
               <div>

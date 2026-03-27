@@ -322,24 +322,53 @@ def proxy_file(public_id: str, resource_type: str = "raw", filename: str = None,
 
 @app.get("/api/dashboard")
 async def get_dashboard(current_user: dict = Depends(get_current_user)):
-    total = await db.properties.count_documents({})
-    types = ["House", "Shop", "Agriculture Land", "Site", "Commercial Godown"]
-    counts = {}
-    for t in types:
-        counts[t] = await db.properties.count_documents({"property_type": t})
+    # Optimized: Use a single aggregation for all counts and location stats
+    pipeline = [
+        {
+            "$facet": {
+                "total": [{"$count": "count"}],
+                "by_type": [
+                    {"$group": {"_id": "$property_type", "count": {"$sum": 1}}}
+                ],
+                "states": [{"$group": {"_id": "$state"}}, {"$match": {"_id": {"$ne": None}}}, {"$project": {"name": "$_id", "_id": 0}}],
+                "districts": [{"$group": {"_id": "$district"}}, {"$match": {"_id": {"$ne": None}}}, {"$project": {"name": "$_id", "_id": 0}}],
+                "mandals": [{"$group": {"_id": "$mandal"}}, {"$match": {"_id": {"$ne": None}}}, {"$project": {"name": "$_id", "_id": 0}}],
+                "villages": [
+                    {"$match": {"location_type": "Village", "village": {"$ne": None}}},
+                    {"$group": {"_id": "$village"}},
+                    {"$project": {"name": "$_id", "_id": 0}}
+                ],
+                "cities": [
+                    {"$match": {"location_type": "City", "city": {"$ne": None}}},
+                    {"$group": {"_id": "$city"}},
+                    {"$project": {"name": "$_id", "_id": 0}}
+                ]
+            }
+        }
+    ]
+    
+    results = await db.properties.aggregate(pipeline).to_list(1)
+    res = results[0] if results else {}
 
-    location_stats = {
-        "states": await db.properties.aggregate([{"$group": {"_id": "$state"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
-        "districts": await db.properties.aggregate([{"$group": {"_id": "$district"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
-        "mandals": await db.properties.aggregate([{"$group": {"_id": "$mandal"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
-        "villages": await db.properties.aggregate([{"$group": {"_id": "$village", "type": {"$first": "$location_type"}}}, {"$match": {"type": "Village"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
-        "cities": await db.properties.aggregate([{"$group": {"_id": "$city", "type": {"$first": "$location_type"}}}, {"$match": {"type": "City"}}, {"$project": {"name": "$_id", "_id": 0}}]).to_list(None),
-    }
+    total = res.get("total", [{}])[0].get("count", 0) if res.get("total") else 0
+    
+    # Map types to counts
+    type_counts = {t["_id"]: t["count"] for t in res.get("by_type", []) if t["_id"]}
+    
+    # Ensure all expected types are present in response
+    expected_types = ["House/Building", "Shop", "Agriculture Land", "Sites/Plots", "Commercial Property", "Flat"]
+    final_counts = {t: type_counts.get(t, 0) for t in expected_types}
 
     return {
         "total": total,
-        "by_type": counts,
-        "locations": location_stats,
+        "by_type": final_counts,
+        "locations": {
+            "states": res.get("states", []),
+            "districts": res.get("districts", []),
+            "mandals": res.get("mandals", []),
+            "villages": res.get("villages", []),
+            "cities": res.get("cities", []),
+        }
     }
 
 # ─── Locations ────────────────────────────────────────────────────────────────

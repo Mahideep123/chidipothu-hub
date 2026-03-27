@@ -4,11 +4,12 @@ import { Building2, Home, Store, Leaf, Map, Warehouse, MapPin, Globe, Navigation
 
 const STAT_CONFIG = [
   { key: 'total', label: 'Total Properties', icon: Building2, color: '#3b82f6', bg: '#dbeafe' },
-  { key: 'House', label: 'Houses', icon: Home, color: '#10b981', bg: '#d1fae5' },
+  { key: 'House/Building', label: 'House/Building', icon: Home, color: '#10b981', bg: '#d1fae5' },
   { key: 'Shop', label: 'Shops', icon: Store, color: '#f59e0b', bg: '#fef3c7' },
   { key: 'Agriculture Land', label: 'Agriculture Land', icon: Leaf, color: '#10b981', bg: '#d1fae5' },
-  { key: 'Site', label: 'Sites', icon: Map, color: '#8b5cf6', bg: '#e9d5ff' },
-  { key: 'Commercial Godown', label: 'Commercial Godown', icon: Warehouse, color: '#ec4899', bg: '#fce7f3' },
+  { key: 'Sites/Plots', label: 'Sites/Plots', icon: Map, color: '#8b5cf6', bg: '#e9d5ff' },
+  { key: 'Commercial Property', label: 'Commercial Property', icon: Warehouse, color: '#ec4899', bg: '#fce7f3' },
+  { key: 'Flat', label: 'Flats', icon: Building2, color: '#f43f5e', bg: '#ffe4e6' },
 ];
 
 const LOC_CONFIG = [
