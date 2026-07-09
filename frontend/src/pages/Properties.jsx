@@ -92,128 +92,22 @@ export default function Properties() {
 
     if (p.remarks) text += `\nRemarks: ${p.remarks}`;
 
-    const filesArray = [];
-    const failedFiles = [];
-
-    let baseUrl = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
-    if (baseUrl.includes('localhost') && window.location.hostname !== 'localhost') {
-      baseUrl = baseUrl.replace('localhost', window.location.hostname);
-    }
-    const secureBase = baseUrl.startsWith('http://') && !baseUrl.includes('localhost')
-      ? baseUrl.replace('http://', 'https://')
-      : baseUrl;
-
-    // Determine proper MIME type based on file extension
-    const getMimeType = (f) => {
-      const name = (f.name || '').toLowerCase();
-      if (name.endsWith('.pdf')) return 'application/pdf';
-      if (name.endsWith('.doc')) return 'application/msword';
-      if (name.endsWith('.docx')) return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
-      if (name.endsWith('.png')) return 'image/png';
-      if (name.endsWith('.jpg') || name.endsWith('.jpeg')) return 'image/jpeg';
-      if (name.endsWith('.gif')) return 'image/gif';
-      if (name.endsWith('.webp')) return 'image/webp';
-      if (f.type === 'image') return 'image/jpeg';
-      return 'application/pdf';
-    };
-
+    // Include attachment links directly in the text (faster, avoids losing user gesture)
     if (p.file_attachments && p.file_attachments.length > 0) {
-      const toastId = toast.loading(`Fetching ${p.file_attachments.length} document(s) for sharing...`);
-      for (const f of p.file_attachments) {
-        try {
-          const cleanName = (f.name || 'document').replace(/[^a-zA-Z0-9._-]/g, '_');
-          const mimeType = getMimeType(f);
-          let blob = null;
-
-          // Strategy 1: Try direct Cloudinary URL first (faster, no proxy overhead)
-          if (f.url) {
-            try {
-              const res = await fetch(f.url, { mode: 'cors', credentials: 'omit' });
-              if (res.ok) {
-                blob = await res.blob();
-              }
-            } catch (e) {
-              // Direct URL failed (likely CORS), try proxy
-            }
-          }
-
-          // Strategy 2: Fall back to proxy URL (for Cloudinary) or direct backend fetch (for MongoDB)
-          if (!blob) {
-            try {
-              let fetchUrl = f.url;
-              if (f.url && f.url.includes('cloudinary') && f.public_id) {
-                const encodedId = encodeURIComponent(f.public_id);
-                const encodedName = encodeURIComponent(f.name || 'document');
-                fetchUrl = `${secureBase}/api/proxy-file/${encodedId}?resource_type=${f.type === 'image' ? 'image' : 'raw'}&filename=${encodedName}`;
-              } else if (f.url && f.url.startsWith('/api/')) {
-                fetchUrl = `${secureBase}${f.url}`;
-              }
-              
-              const res = await fetch(fetchUrl, { mode: 'cors', credentials: 'omit' });
-              if (res.ok) {
-                blob = await res.blob();
-              }
-            } catch (e) {
-              // Fetch failed
-            }
-          }
-
-          if (blob) {
-            filesArray.push(new File([blob], cleanName, { type: mimeType }));
-          } else {
-            // Could not fetch — track it so we can include the URL in share text
-            failedFiles.push(f);
-          }
-
-          await new Promise(r => setTimeout(r, 200));
-        } catch (e) {
-          console.error('[Share] Fatal error:', e);
-          failedFiles.push(f);
-        }
-      }
-      toast.dismiss(toastId);
-    }
-
-    // Append URLs for files that couldn't be fetched, so recipient can still access them
-    if (failedFiles.length > 0) {
       text += `\n\n*Attachment Links:*`;
-      failedFiles.forEach(f => {
+      p.file_attachments.forEach(f => {
         text += `\n${f.name || 'Document'}: ${f.url}`;
       });
     }
 
-    if (p.file_attachments && p.file_attachments.length > 0 && filesArray.length > 0) {
-      text += `\n\n*Attachments:* ${filesArray.length} file(s) attached`;
-    }
-
     if (navigator.share) {
       try { 
-        if (filesArray.length > 0 && navigator.canShare && navigator.canShare({ files: filesArray })) {
-          await navigator.share({ title: 'Property Details', text, files: filesArray });
-        } else {
-          if (filesArray.length > 0) {
-            toast('Your browser does not support file sharing. Sharing text with attachment links instead.', { icon: 'ℹ️' });
-            // Include all file URLs in text since we can't share files
-            if (failedFiles.length === 0 && p.file_attachments?.length > 0) {
-              text += `\n\n*Attachment Links:*`;
-              p.file_attachments.forEach(f => {
-                text += `\n${f.name || 'Document'}: ${f.url}`;
-              });
-            }
-          }
-          await navigator.share({ title: 'Property Details', text });
-        }
+        await navigator.share({ title: 'Property Details', text });
       } catch(err) { 
         if (err.name !== 'AbortError') toast.error('Sharing failed: ' + err.message);
       }
     } else {
-      // Clipboard fallback — include all attachment URLs
-      if (p.file_attachments?.length > 0 && failedFiles.length === 0) {
-        text += `\n\n*Attachment Links:*`;
-        p.file_attachments.forEach(f => {
-          text += `\n${f.name || 'Document'}: ${f.url}`;
-        });
-      }
+      // Clipboard fallback for browsers that don't support navigator.share
       navigator.clipboard.writeText(text);
       toast.success('Property details copied to clipboard!');
     }
