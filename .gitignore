@@ -1,9 +1,10 @@
 # Dependencies
 node_modules/
 
-# Environment
-.env
-.env.local
+# Environment — block backend secrets, allow frontend public URL
+backend/.env
+backend/.env.local
+# frontend/.env is safe to commit (only contains REACT_APP_BACKEND_URL, not secrets)
 
 # Build
 build/

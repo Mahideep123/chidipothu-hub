@@ -1,3 +1,4 @@
+from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, Response, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
@@ -16,23 +17,29 @@ from fastapi.responses import StreamingResponse, JSONResponse, RedirectResponse
 
 load_dotenv()
 
-app = FastAPI(title="Chidipothu Hub API")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Startup: create DB indexes
+    await db.properties.create_index([
+        ("owner_name", "text"),
+        ("document_number", "text"),
+        ("survey_number", "text"),
+        ("village", "text")
+    ])
+    await db.properties.create_index("created_at")
+    await db.properties.create_index("property_type")
+    await db.otps.create_index("email")
+    await db.otps.create_index("expires_at", expireAfterSeconds=0)
+    yield
+    # Shutdown (nothing needed)
 
-origins = [
-    "http://localhost:3000",
-    "http://localhost:3001",
-    "https://chidipothu-hub-zfpr.vercel.app",
-    "https://chidipothu-hub.vercel.app",
-    "https://chidipothusridhar.vercel.app"
-]
-if os.getenv("FRONTEND_URL"):
-    origins.append(os.getenv("FRONTEND_URL"))
+app = FastAPI(title="Chidipothu Hub API", lifespan=lifespan)
 
+# Allow ALL origins — this is a private single-user app; no public data exposure
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"https://.*\.vercel\.app", # Allow all Vercel previews/domains
-    allow_credentials=True,
+    allow_origins=["*"],
+    allow_credentials=False,  # Must be False when allow_origins=["*"]
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -40,22 +47,6 @@ app.add_middleware(
 # MongoDB
 client = AsyncIOMotorClient(os.getenv("MONGO_URL"))
 db = client[os.getenv("DB_NAME", "chidipothu_hub")]
-
-@app.on_event("startup")
-async def startup_db_client():
-    # Improve search performance with indexes
-    await db.properties.create_index([
-        ("owner_name", "text"), 
-        ("document_number", "text"), 
-        ("survey_number", "text"),
-        ("village", "text")
-    ])
-    await db.properties.create_index("created_at")
-    await db.properties.create_index("property_type")
-    
-    # OTP optimization
-    await db.otps.create_index("email")
-    await db.otps.create_index("expires_at", expireAfterSeconds=0) # Auto-delete expired OTPs
 
 # Cloudinary config
 cloudinary.config(
@@ -70,6 +61,12 @@ JWT_EXPIRE_HOURS = 12
 
 GMAIL_USER = os.getenv("GMAIL_USER", "S10719346@gmail.com")
 GMAIL_PASSWORD = os.getenv("GMAIL_APP_PASSWORD", "")
+
+# Strip surrounding quotes from env vars (common mistake in .env files)
+def _strip_quotes(val: str) -> str:
+    if val and len(val) >= 2 and val[0] == '"' and val[-1] == '"':
+        return val[1:-1]
+    return val
 
 security = HTTPBearer()
 
@@ -209,10 +206,10 @@ async def send_otp(req: OTPRequest):
 
 @app.post("/api/auth/password-login")
 async def password_login(req: PasswordLogin):
-    expected_password = os.getenv("LOGIN_PASSWORD", "234")
+    expected_password = _strip_quotes(os.getenv("LOGIN_PASSWORD", "234"))
     if req.password != expected_password:
         raise HTTPException(status_code=401, detail="Incorrect password")
-    admin_name = os.getenv("ADMIN_USERNAME", "SRIDHAR CHIDIPOTHU")
+    admin_name = _strip_quotes(os.getenv("ADMIN_USERNAME", "SRIDHAR CHIDIPOTHU"))
     token = create_jwt(admin_name)
     return {"token": token, "user": admin_name}
 

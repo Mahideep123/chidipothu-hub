@@ -2,8 +2,12 @@ import axios from 'axios';
 
 const BASE_URL = process.env.REACT_APP_BACKEND_URL || 'http://localhost:8001';
 
-const api = axios.create({ baseURL: BASE_URL });
+const api = axios.create({
+  baseURL: BASE_URL,
+  timeout: 30000, // 30s timeout — gives Render free tier time to wake up
+});
 
+// Attach JWT token to every request
 api.interceptors.request.use((config) => {
   const token = sessionStorage.getItem('token');
   if (token) {
@@ -11,6 +15,27 @@ api.interceptors.request.use((config) => {
   }
   return config;
 });
+
+// Global response error handler
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (!error.response) {
+      // Network error — backend offline or sleeping
+      error.friendlyMessage =
+        'Cannot reach the server. The backend may be waking up (Render free tier). Please wait 30 seconds and try again.';
+    } else if (error.response.status === 401) {
+      // Token expired — auto logout
+      const isLoginRoute = error.config?.url?.includes('/auth/');
+      if (!isLoginRoute) {
+        sessionStorage.removeItem('token');
+        sessionStorage.removeItem('user');
+        window.location.href = '/login';
+      }
+    }
+    return Promise.reject(error);
+  }
+);
 
 // Auth
 export const passwordLogin = (password) => api.post('/api/auth/password-login', { password });

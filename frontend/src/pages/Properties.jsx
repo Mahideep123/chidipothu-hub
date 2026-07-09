@@ -310,7 +310,6 @@ export default function Properties() {
       toast.success('Downloads started!', { id: toastId });
     }
     toast.dismiss();
-    toast.success('Downloads started!');
   };
 
   const handleDelete = async (id) => {
@@ -630,7 +629,9 @@ export default function Properties() {
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.document_location || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b' }}>{p.land_as_per_1b || '—'}</td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', maxWidth: '180px' }}>
-                    {[p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '—'}
+                    {p.location_type === 'City'
+                      ? [p.city, p.mandal, p.district, p.state].filter(Boolean).join(', ')
+                      : [p.village, p.mandal, p.district, p.state].filter(Boolean).join(', ') || '—'}
                   </td>
                   <td style={{ padding: '14px 16px', fontSize: '13px', color: '#64748b', whiteSpace: 'nowrap' }}>
                     {p.extent_value ? p.extent_value + ' ' + p.extent_unit : '—'}

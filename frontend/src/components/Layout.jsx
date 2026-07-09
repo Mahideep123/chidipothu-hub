@@ -80,7 +80,7 @@ export default function Layout({ children }) {
   return (
     <div style={{ display: 'flex', minHeight: '100vh', fontFamily: "'Inter',sans-serif" }}>
       {/* Desktop sidebar */}
-      <div style={{ width: '260px', flexShrink: 0, display: 'block' }}>
+      <div className="desktop-sidebar" style={{ width: '260px', flexShrink: 0 }}>
         <Sidebar />
       </div>
 

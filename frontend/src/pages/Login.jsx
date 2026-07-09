@@ -1,18 +1,20 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { passwordLogin } from '../api';
-import { Building2, Lock, Eye, EyeOff } from 'lucide-react';
+import { Building2, Lock, Eye, EyeOff, AlertCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const Login = () => {
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
   const navigate = useNavigate();
 
   const handleLogin = async (e) => {
     e.preventDefault();
     setLoading(true);
+    setErrorMsg('');
     try {
       const { data } = await passwordLogin(password);
       sessionStorage.setItem('token', data.token);
@@ -20,7 +22,12 @@ const Login = () => {
       toast.success('Welcome back!');
       navigate('/dashboard');
     } catch (err) {
-      toast.error(err.response?.data?.detail || 'Incorrect password');
+      const msg =
+        err.friendlyMessage ||
+        err.response?.data?.detail ||
+        'Something went wrong. Please try again.';
+      setErrorMsg(msg);
+      toast.error(msg.length > 60 ? 'Login failed. Check error below.' : msg);
     } finally {
       setLoading(false);
     }
@@ -135,6 +142,7 @@ const Login = () => {
               onChange={(e) => setPassword(e.target.value)}
               style={{
                 width: '100%',
+                boxSizing: 'border-box',
                 padding: '14px 44px 14px 40px',
                 background: 'rgba(15, 23, 42, 0.6)',
                 border: '1px solid rgba(148, 163, 184, 0.15)',
@@ -195,6 +203,25 @@ const Login = () => {
             {loading ? 'Signing in...' : 'Sign In'}
           </button>
         </form>
+
+        {/* Error message box */}
+        {errorMsg && (
+          <div style={{
+            marginTop: '16px',
+            padding: '12px 16px',
+            background: 'rgba(239,68,68,0.1)',
+            border: '1px solid rgba(239,68,68,0.25)',
+            borderRadius: '10px',
+            display: 'flex',
+            alignItems: 'flex-start',
+            gap: '10px',
+          }}>
+            <AlertCircle size={16} color="#f87171" style={{ flexShrink: 0, marginTop: '2px' }} />
+            <p style={{ margin: 0, color: '#f87171', fontSize: '13px', lineHeight: '1.5' }}>
+              {errorMsg}
+            </p>
+          </div>
+        )}
 
         <p style={{
           textAlign: 'center', color: '#475569', fontSize: '11px',

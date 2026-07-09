@@ -49,7 +49,7 @@ const Grid = ({ children }) => (
   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '12px' }}>{children}</div>
 );
 
-const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '',
+const empty = { state: '', district: '', mandal: '', village: '', property_type: 'House/Building', property_name: '', door_no: '', owner_name: '', plot_no: '', document_number: '', survey_number: '', lpm_number: '', patta_number: '', land_as_per_1b: '', khata_number: '', assessment_number: '', mother_document: '', document_location: '', remarks: '',
     extent_value: '',
     extent_unit: 'Acres',
     location_type: 'Village',
@@ -154,7 +154,12 @@ export default function PropertyForm({ mode = 'add' }) {
   const sectionStyle = { background: '#fff', borderRadius: '12px', padding: '20px', marginBottom: '16px', boxShadow: '0 2px 8px rgba(0,0,0,0.05)' };
   const sectionTitleStyle = { fontFamily: "'Manrope',sans-serif", fontSize: '15px', fontWeight: 700, color: '#1e293b', margin: '0 0 16px', paddingBottom: '10px', borderBottom: '1px solid #f1f5f9' };
   const labelStyle = { display: 'block', fontSize: '12px', fontWeight: 600, color: '#374151', marginBottom: '5px', textTransform: 'uppercase', letterSpacing: '0.4px' };
-  const inputStyle = { ...INPUT_STYLE, onFocus: e => e.target.style.borderColor = '#6366f1', onBlur: e => e.target.style.borderColor = '#e2e8f0' };
+  // inputStyle for inline use (event handlers must be on the element, not in the style object)
+  const inputStyle = { ...INPUT_STYLE };
+  const focusHandlers = {
+    onFocus: e => e.target.style.borderColor = '#6366f1',
+    onBlur: e => e.target.style.borderColor = '#e2e8f0',
+  };
 
 
   return (
@@ -178,6 +183,7 @@ export default function PropertyForm({ mode = 'add' }) {
               onChange={(e) => setForm({ ...form, state: e.target.value })}
               placeholder="Enter state"
               style={inputStyle}
+              {...focusHandlers}
               required
             />
           </div>
@@ -188,6 +194,7 @@ export default function PropertyForm({ mode = 'add' }) {
               onChange={(e) => setForm({ ...form, district: e.target.value })}
               placeholder="Enter district"
               style={inputStyle}
+              {...focusHandlers}
               required
             />
           </div>
@@ -198,6 +205,7 @@ export default function PropertyForm({ mode = 'add' }) {
               onChange={(e) => setForm({ ...form, mandal: e.target.value })}
               placeholder="Enter mandal"
               style={inputStyle}
+              {...focusHandlers}
               required
             />
           </div>
@@ -220,6 +228,7 @@ export default function PropertyForm({ mode = 'add' }) {
                 onChange={(e) => setForm({ ...form, village: e.target.value })}
                 placeholder="Enter village name"
                 style={inputStyle}
+                {...focusHandlers}
                 required
               />
             </div>
@@ -231,6 +240,7 @@ export default function PropertyForm({ mode = 'add' }) {
                 onChange={(e) => setForm({ ...form, city: e.target.value })}
                 placeholder="Enter city name"
                 style={inputStyle}
+                {...focusHandlers}
                 required
               />
             </div>
@@ -244,6 +254,7 @@ export default function PropertyForm({ mode = 'add' }) {
                   onChange={(e) => setForm({ ...form, road_street: e.target.value })}
                   placeholder="Enter road/street"
                   style={inputStyle}
+                  {...focusHandlers}
                 />
               </div>
               <div>
@@ -253,6 +264,7 @@ export default function PropertyForm({ mode = 'add' }) {
                   onChange={(e) => setForm({ ...form, area: e.target.value })}
                   placeholder="Enter area"
                   style={inputStyle}
+                  {...focusHandlers}
                 />
               </div>
               <div>
@@ -262,6 +274,7 @@ export default function PropertyForm({ mode = 'add' }) {
                   onChange={(e) => setForm({ ...form, pincode: e.target.value })}
                   placeholder="Enter pincode"
                   style={inputStyle}
+                  {...focusHandlers}
                 />
               </div>
             </>
